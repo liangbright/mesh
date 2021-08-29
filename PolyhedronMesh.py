@@ -82,7 +82,7 @@ class PolyhedronMesh:
         mesh_vtk.SetPoints(Points_vtk)
         mesh_vtk.Allocate(len(self.element))
         for n in range(0, len(self.element)):
-            e=list(self.element[n])
+            e=[int(id) for id in self.element[n]]
             if len(e) == 8:
                 cell_type=vtk.VTK_HEXAHEDRON
             elif len(e) == 6:

@@ -56,16 +56,6 @@ class QuadMesh(PolygonMesh):
         normal=normal.contiguous()
         return normal
 
-    def update_edge_length(self):
-         self.edge_length=QuadMesh.cal_edge_length(self.node, self.adj_node_link)
-
-    @staticmethod
-    def cal_edge_length(node, adj_node_link):
-        x_i=node[adj_node_link[:,0]]
-        x_j=node[adj_node_link[:,1]]
-        edge_length=torch.norm(x_j-x_i, p=2, dim=1, keepdim=True)
-        return edge_length
-
     def update_element_area_and_normal(self):
          self.element_area, self.element_normal=QuadMesh.cal_element_area_and_normal(self.node, self.element)
 

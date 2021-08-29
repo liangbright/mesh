@@ -29,39 +29,6 @@ class PolygonMesh:
         self.element_data={}
         self.mesh_data={}
 
-    def build_adj_node_link(self):
-        adj_node_link=[]
-        for n in range(0, len(self.element)):
-            e=self.element[n]
-            for m in range(0, len(e)):
-                if m < len(e)-1:
-                    adj_node_link.append([e[m], e[m+1]])
-                    adj_node_link.append([e[m+1], e[m]])
-                else:
-                    adj_node_link.append([e[m], e[0]])
-                    adj_node_link.append([e[0], e[m]])
-        adj_node_link=torch.tensor(adj_node_link, dtype=torch.int64)
-        adj_node_link=torch.unique(adj_node_link, dim=0, sorted=True)
-        self.adj_node_link=adj_node_link
-
-    def build_adj_element_link(self):
-        adj_element_link=[]
-        element=self.element
-        if isinstance(element, torch.Tensor):
-            element=element.detach().cpu().numpy()
-        for n in range(0, len(element)):
-            e_n=element[n]
-            for m in range(n+1, len(element)):
-                e_m=element[m]
-                temp=np.isin(e_n, e_m, assume_unique=True)
-                temp=np.sum(temp)
-                if temp == 2:
-                    adj_element_link.append([n, m])
-                    adj_element_link.append([m, n])
-        adj_element_link=torch.tensor(adj_element_link, dtype=torch.int64)
-        adj_element_link=torch.unique(adj_element_link, dim=0, sorted=True)
-        self.adj_element_link=adj_element_link
-
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
             print("cannot import vtk")
@@ -120,7 +87,7 @@ class PolygonMesh:
         mesh_vtk.SetPoints(Points_vtk)
         mesh_vtk.Allocate(len(self.element))
         for n in range(0, len(self.element)):
-            e=list(self.element[n])
+            e=[int(id) for id in self.element[n]]
             if len(e) <= 2:
                 print('len(e)=', len(e), ': ignored')
                 continue
@@ -194,9 +161,52 @@ class PolygonMesh:
             self.element_data=data["element_data"]
         if "mesh_data" in data.keys():
             self.mesh_data=data["mesh_data"]
+
+    def build_adj_node_link(self):
+        adj_node_link=[]
+        for n in range(0, len(self.element)):
+            e=self.element[n]
+            for m in range(0, len(e)):
+                if m < len(e)-1:
+                    adj_node_link.append([e[m], e[m+1]])
+                    adj_node_link.append([e[m+1], e[m]])
+                else:
+                    adj_node_link.append([e[m], e[0]])
+                    adj_node_link.append([e[0], e[m]])
+        adj_node_link=torch.tensor(adj_node_link, dtype=torch.int64)
+        adj_node_link=torch.unique(adj_node_link, dim=0, sorted=True)
+        self.adj_node_link=adj_node_link
+
+    def build_adj_element_link(self):
+        adj_element_link=[]
+        element=self.element
+        if isinstance(element, torch.Tensor):
+            element=element.detach().cpu().numpy()
+        for n in range(0, len(element)):
+            e_n=element[n]
+            for m in range(n+1, len(element)):
+                e_m=element[m]
+                temp=np.isin(e_n, e_m, assume_unique=True)
+                temp=np.sum(temp)
+                if temp == 2:
+                    adj_element_link.append([n, m])
+                    adj_element_link.append([m, n])
+        adj_element_link=torch.tensor(adj_element_link, dtype=torch.int64)
+        adj_element_link=torch.unique(adj_element_link, dim=0, sorted=True)
+        self.adj_element_link=adj_element_link
+
+    def update_edge_length(self):
+         self.edge_length=PolygonMesh.cal_edge_length(self.node, self.adj_node_link)
+
+    @staticmethod
+    def cal_edge_length(node, adj_node_link):
+        x_i=node[adj_node_link[:,0]]
+        x_j=node[adj_node_link[:,1]]
+        edge_length=torch.norm(x_j-x_i, p=2, dim=1, keepdim=True)
+        return edge_length
 #%%
 if __name__ == "__main__":
-    filename="C:/Research/AorticValve/TAVR/1908788_0_im_5_phase1/OutputWall_2017_5_17_10_28.json.vtk"
+    filename="F:/MLFEA/TAA/p0_ssm/343c1.5/bav17_AortaModel_P0_best.vtk"
     root=PolygonMesh()
     root.load_from_vtk(filename, torch.float32)
-    root.save_by_vtk("test_poly.vtk")
+    root.save_by_vtk("F:/MLFEA/TAA/p0_ssm/test_poly.vtk")

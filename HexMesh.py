@@ -11,14 +11,6 @@ import json
 from torch.linalg import det
 from Element_C3D8 import cal_dh_dr, get_integration_point_1i, get_integration_point_8i, interpolate
 from PolyhedronMesh import PolyhedronMesh
-_Flag_VTK_IMPORT_=False
-try:
-    import vtk
-    from vtk import vtkPoints
-    from vtk import vtkPolyData, vtkPolyDataReader, vtkPolyDataWriter
-    _Flag_VTK_IMPORT_=True
-except:
-    print("cannot import vtk")
 #%%
 class HexMesh(PolyhedronMesh):
     #8-node C3D8 mesh

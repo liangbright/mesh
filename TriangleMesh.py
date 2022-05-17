@@ -9,14 +9,6 @@ import torch_scatter
 import numpy as np
 import json
 from PolygonMesh import PolygonMesh
-_Flag_VTK_IMPORT_=False
-try:
-    import vtk
-    from vtk import vtkPoints
-    from vtk import vtkPolyData, vtkPolyDataReader, vtkPolyDataWriter
-    _Flag_VTK_IMPORT_=True
-except:
-    print("cannot import vtk")
 #%%
 class TriangleMesh(PolygonMesh):
 

@@ -9,8 +9,41 @@ import numpy as np
 from Mesh import Mesh
 #%%
 class PolygonMesh(Mesh):
+    # use this class to handle mixture of triangle and quad elements
     def __init__(self):
         super().__init__('polygon')
+
+    def build_adj_node_link(self, undirected):
+        #undirected: True or False
+        adj_node_link=[]
+        if undirected == True:
+            for n in range(0, len(self.element)):
+                e=self.element[n]
+                for m in range(0, len(e)):
+                    if m < len(e)-1:
+                        a=e[m]; b=e[m+1]
+                    else:
+                        a=e[m]; b=e[0]
+                    adj_node_link.append([a, b])
+                    adj_node_link.append([b, a])
+        else:
+            for n in range(0, len(self.element)):
+                e=self.element[n]
+                for m in range(0, len(e)):
+                    if m < len(e)-1:
+                        a=e[m]; b=e[m+1]
+                    else:
+                        a=e[m]; b=e[0]
+                    if a < b:
+                        adj_node_link.append([a, b])
+                    else:
+                        adj_node_link.append([b, a])
+        adj_node_link=torch.tensor(adj_node_link, dtype=torch.int64)
+        adj_node_link=torch.unique(adj_node_link, dim=0, sorted=True)
+        if undirected == True:
+            self.adj_node_link['undirected']=adj_node_link
+        else:
+            self.adj_node_link['directed']=adj_node_link
 
     def update_edge_length(self):
          self.edge_length=PolygonMesh.cal_edge_length(self.node, self.adj_node_link)

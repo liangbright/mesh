@@ -15,15 +15,14 @@ except:
 #%%
 class Mesh:
     def __init__(self, mesh_type):
-        if mesh_type=='polyhedron' or mesh_type=='tetrahedron' or mesh_type=='hexahedron':
-            pass
-        elif mesh_type=='polygon' or mesh_type=='triangle' or mesh_type=='quad':
+        if mesh_type=='polyhedron' or mesh_type=='polygon':
             pass
         else:
             raise ValueError('unknown mesh_type:'+mesh_type)
         self.mesh_type=mesh_type
         self.node=[] #Nx2 or Nx3
         self.element=[] #[e_1,...e_M], e1 is a list of node indexes in e1
+        self.element_type=None#None means all elements have the same type
         self.node_name_to_index={} #e.g., {'landmark1':10}
         self.node_set={} #e.g., {'set1':[0,1,2]}
         self.element_set={} #e.g., {'set1':[1,3,5]}
@@ -31,19 +30,26 @@ class Mesh:
         self.element_data={} #e.g., {'stress':stress}, stress is Mx9 2D array
         self.mesh_data={} # it is only saved by torch
         self.node_to_element_link=None
-        self.adj_node_link=None
+        self.adj_node_link={'directed':None, 'undirected':None}
         self.adj_element_link=None
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
             print("cannot import vtk")
             return
-        if self.mesh_type=='polyhedron' or self.mesh_type=='tetrahedron' or self.mesh_type=='hexahedron':
+        if 'polyhedron' in self.mesh_type:
             reader = vtk.vtkUnstructuredGridReader()
-        elif self.mesh_type=='polygon' or self.mesh_type=='triangle' or self.mesh_type=='quad':
+        elif 'polygon' in self.mesh_type:
             reader = vtk.vtkPolyDataReader()
         else:
             raise ValueError('unknown mesh_type:'+self.mesh_type)
+        if isinstance(dtype, str):
+            if dtype == 'float32':
+                dtype=torch.float32
+            elif dtype == 'float64':
+                dtype=torch.float64
+            else:
+                ValueError('unknown dtype:'+str(dtype))
         reader.SetFileName(filename)
         reader.Update()
         mesh_vtk = reader.GetOutput()
@@ -85,8 +91,8 @@ class Mesh:
             self.element_data[name]=torch.tensor(data, dtype=dtype)
 
     @staticmethod
-    def get_vtk_cell_type(mesh_type, n_nodes):
-        if mesh_type=='polyhedron' or mesh_type=='tetrahedron' or mesh_type=='hexahedron':
+    def get_vtk_cell_type(element_type, n_nodes):
+        if 'polyhedron' in element_type=='polyhedron':
             if n_nodes == 4:
                 cell_type=vtk.VTK_TETRA
             elif n_nodes == 6:
@@ -95,7 +101,7 @@ class Mesh:
                 cell_type=vtk.VTK_HEXAHEDRON
             else:
                 cell_type=vtk.VTK_POLYHEDRON
-        elif mesh_type=='polygon' or mesh_type=='triangle' or mesh_type=='quad':
+        elif 'polygon' in element_type:
             if n_nodes == 3:
                 cell_type=vtk.VTK_TRIANGLE
             elif n_nodes == 4:
@@ -103,7 +109,7 @@ class Mesh:
             else:
                 cell_type=vtk.VTK_POLYGON
         else:
-            raise ValueError('unknown mesh_type:'+mesh_type)
+            raise ValueError('unknown element_type:'+element_type)
         return cell_type
 
     def convert_to_vtk(self):
@@ -115,9 +121,9 @@ class Mesh:
         Points_vtk.SetNumberOfPoints(len(self.node))
         for n in range(0, len(self.node)):
             Points_vtk.SetPoint(n, float(self.node[n,0]), float(self.node[n,1]), float(self.node[n,2]))
-        if self.mesh_type=='polyhedron' or self.mesh_type=='tetrahedron' or self.mesh_type=='hexahedron':
+        if 'polyhedron' in self.mesh_type:
             mesh_vtk = vtk.vtkUnstructuredGrid()
-        elif self.mesh_type=='polygon' or self.mesh_type=='triangle' or self.mesh_type=='quad':
+        elif 'polygon' in self.mesh_type:
             mesh_vtk = vtk.vtkPolyData()
         else:
             raise ValueError('unknown mesh_type:'+self.mesh_type)
@@ -125,7 +131,10 @@ class Mesh:
         mesh_vtk.Allocate(len(self.element))
         for n in range(0, len(self.element)):
             e=[int(id) for id in self.element[n]]
-            cell_type=Mesh.get_vtk_cell_type(self.mesh_type, len(e))
+            if self.element_type is None:
+                cell_type=Mesh.get_vtk_cell_type(self.mesh_type, len(e))
+            else:
+                cell_type=Mesh.get_vtk_cell_type(self.element_type[n], len(e))
             mesh_vtk.InsertNextCell(cell_type, len(e), e)
         #--------- convert node_data to PointData --------#
         for name, data in self.node_data.items():
@@ -160,9 +169,9 @@ class Mesh:
         mesh_vtk=self.convert_to_vtk()
         if mesh_vtk is None:
             return
-        if self.mesh_type=='polyhedron' or self.mesh_type=='tetrahedron' or self.mesh_type=='hexahedron':
+        if 'polyhedron' in self.mesh_type:
             writer=vtk.vtkUnstructuredGridWriter()
-        elif self.mesh_type=='polygon' or self.mesh_type=='triangle' or self.mesh_type=='quad':
+        elif 'polygon' in self.mesh_type:
             writer=vtk.vtkPolyDataWriter()
         else:
             raise ValueError('unknown mesh_type:'+self.mesh_type)
@@ -225,7 +234,21 @@ class Mesh:
         if "adj_element_link" in data.keys():
             self.adj_element_link=data["adj_element_link"]
 
-    def build_node_to_element_link(self,):
+    def build_adj_node_link(self):
+        #assume: nodes in an element are adjacent to each other
+        adj_node_link=[]
+        for m in range(0, len(self.element)):
+            e=self.element[m]
+            for j in range(0, len(e)):
+                for i in range(0, len(e)):
+                    if i != j:
+                        adj_node_link.append([e[j], e[i]])
+                        adj_node_link.append([e[i], e[j]])
+        adj_node_link=torch.tensor(adj_node_link, dtype=torch.int64)
+        adj_node_link=torch.unique(adj_node_link, dim=0, sorted=True)
+        self.adj_node_link['undirected']=adj_node_link
+
+    def build_node_to_element_link(self):
         #do not do this: node_to_element_link=[[]]*self.node.shape[0]
         # a=[[]]*2=[[],[]], and a[0] and a[1] are the same object
         # a=[[],[]], and a[0] and a[1] are two different objects
@@ -233,26 +256,11 @@ class Mesh:
         element=self.element
         if isinstance(element, torch.Tensor):
             element=element.detach().cpu().numpy()
-        for n in range(0, len(element)):
-            e=element[n]
-            for m in range(0, len(e)):
-                node_to_element_link[e[m]].append(n)
+        for m in range(0, len(element)):
+            e=element[m]
+            for k in range(0, len(e)):
+                node_to_element_link[e[k]].append(m)
         self.node_to_element_link=node_to_element_link
-
-    def build_adj_node_link(self):
-        adj_node_link=[]
-        for n in range(0, len(self.element)):
-            e=self.element[n]
-            for m in range(0, len(e)):
-                if m < len(e)-1:
-                    adj_node_link.append([e[m], e[m+1]])
-                    adj_node_link.append([e[m+1], e[m]])
-                else:
-                    adj_node_link.append([e[m], e[0]])
-                    adj_node_link.append([e[0], e[m]])
-        adj_node_link=torch.tensor(adj_node_link, dtype=torch.int64)
-        adj_node_link=torch.unique(adj_node_link, dim=0, sorted=True)
-        self.adj_node_link=adj_node_link
 
     def build_adj_element_link_n1(self):
         self.build_node_to_element_link()

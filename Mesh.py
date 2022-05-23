@@ -37,12 +37,6 @@ class Mesh:
         if _Flag_VTK_IMPORT_ == False:
             print("cannot import vtk")
             return
-        if 'polyhedron' in self.mesh_type:
-            reader = vtk.vtkUnstructuredGridReader()
-        elif 'polygon' in self.mesh_type:
-            reader = vtk.vtkPolyDataReader()
-        else:
-            raise ValueError('unknown mesh_type:'+self.mesh_type)
         if isinstance(dtype, str):
             if dtype == 'float32':
                 dtype=torch.float32
@@ -50,6 +44,12 @@ class Mesh:
                 dtype=torch.float64
             else:
                 ValueError('unknown dtype:'+str(dtype))
+        if 'polyhedron' in self.mesh_type:
+            reader = vtk.vtkUnstructuredGridReader()
+        elif 'polygon' in self.mesh_type:
+            reader = vtk.vtkPolyDataReader()
+        else:
+            raise ValueError('unknown mesh_type:'+self.mesh_type)
         reader.SetFileName(filename)
         reader.Update()
         mesh_vtk = reader.GetOutput()

@@ -71,8 +71,6 @@ class Tri3Mesh(PolygonMesh):
     def subdivide(self):
         #return a new mesh
         #add a node in the middle of each edge
-        if self.adj_node_link["undirected"] is None:
-            self.build_adj_node_link(undirected=True)
         if self.adj_node_link["directed"] is None:
             self.build_adj_node_link(undirected=False)
         x_j=self.node[self.adj_node_link["directed"][:,0]]

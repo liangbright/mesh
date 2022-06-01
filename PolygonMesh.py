@@ -17,23 +17,23 @@ class PolygonMesh(Mesh):
         #undirected: True or False
         adj_node_link=[]
         if undirected == True:
-            for n in range(0, len(self.element)):
-                e=self.element[n]
-                for m in range(0, len(e)):
-                    if m < len(e)-1:
-                        a=e[m]; b=e[m+1]
+            for m in range(0, len(self.element)):
+                e=self.element[m]
+                for k in range(0, len(e)):
+                    if k < len(e)-1:
+                        a=e[k]; b=e[k+1]
                     else:
-                        a=e[m]; b=e[0]
+                        a=e[k]; b=e[0]
                     adj_node_link.append([a, b])
                     adj_node_link.append([b, a])
         else:
-            for n in range(0, len(self.element)):
-                e=self.element[n]
-                for m in range(0, len(e)):
-                    if m < len(e)-1:
-                        a=e[m]; b=e[m+1]
+            for m in range(0, len(self.element)):
+                e=self.element[m]
+                for k in range(0, len(e)):
+                    if k < len(e)-1:
+                        a=e[k]; b=e[k+1]
                     else:
-                        a=e[m]; b=e[0]
+                        a=e[k]; b=e[0]
                     if a < b:
                         adj_node_link.append([a, b])
                     else:
@@ -50,9 +50,9 @@ class PolygonMesh(Mesh):
 
     @staticmethod
     def cal_edge_length(node, adj_node_link):
-        x_i=node[adj_node_link[:,0]]
-        x_j=node[adj_node_link[:,1]]
-        edge_length=torch.norm(x_j-x_i, p=2, dim=1, keepdim=True)
+        x_j=node[adj_node_link[:,0]]
+        x_i=node[adj_node_link[:,1]]
+        edge_length=torch.norm(x_i-x_j, p=2, dim=1, keepdim=True)
         return edge_length
 #%%
 if __name__ == "__main__":

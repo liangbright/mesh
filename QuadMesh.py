@@ -99,8 +99,6 @@ class Quad4Mesh(PolygonMesh):
         #add a node in the middle of each element
         nodeA=self.node[self.element].mean(dim=1) #(N,3) => (M,8,3) => (M,3)
         #add a node in the middle of each edge
-        if self.adj_node_link["undirected"] is None:
-            self.build_adj_node_link(undirected=True)
         if self.adj_node_link["directed"] is None:
             self.build_adj_node_link(undirected=False)
         x_j=self.node[self.adj_node_link["directed"][:,0]]

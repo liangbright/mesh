@@ -15,7 +15,7 @@ except:
 #%%
 class Mesh:
     def __init__(self, mesh_type):
-        if mesh_type=='polyhedron' or mesh_type=='polygon':
+        if ('polyhedron' in mesh_type) or ('polygon' in mesh_type):
             pass
         else:
             raise ValueError('unknown mesh_type:'+mesh_type)
@@ -92,7 +92,7 @@ class Mesh:
 
     @staticmethod
     def get_vtk_cell_type(element_type, n_nodes):
-        if 'polyhedron' in element_type=='polyhedron':
+        if 'polyhedron' in element_type:
             if n_nodes == 4:
                 cell_type=vtk.VTK_TETRA
             elif n_nodes == 6:

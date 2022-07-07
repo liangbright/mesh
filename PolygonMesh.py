@@ -59,4 +59,8 @@ if __name__ == "__main__":
     filename="F:/MLFEA/TAA/data/343c1.5/bav17_AortaModel_P0_best.vtk"
     root=PolygonMesh()
     root.load_from_vtk(filename, torch.float32)
-    root.save_by_vtk("F:/MLFEA/TAA/p0_ssm/test_poly.vtk")
+    root.node_data={'node_data1':torch.rand((len(root.node), 6)),
+                     'node_data2':torch.rand((len(root.node), 6))}
+    root.element_data={'element_data1':torch.rand((len(root.element), 6)),
+                       'element_data2':torch.rand((len(root.element), 6))}
+    root.save_by_vtk("F:/MLFEA/TAA/test_poly.vtk")

@@ -6,6 +6,7 @@ Created on Mon May 16 22:07:37 2022
 """
 import torch
 import numpy as np
+from SaveMeshAsVTKFile import save_polygon_mesh_to_vtk, save_polyhedron_mesh_to_vtk
 _Flag_VTK_IMPORT_=False
 try:
     import vtk
@@ -166,6 +167,15 @@ class Mesh:
         return mesh_vtk
 
     def save_by_vtk(self, filename, ascii=True, vtk42=True):
+        if _Flag_VTK_IMPORT_ == False:
+            if 'polyhedron' in self.mesh_type:
+                save_polyhedron_mesh_to_vtk(self, filename)
+            elif 'polygon' in self.mesh_type:
+                save_polygon_mesh_to_vtk(self, filename)
+            else:
+                raise ValueError('unknown mesh_type:'+self.mesh_type)
+            return
+        #-----------------------------
         mesh_vtk=self.convert_to_vtk()
         if mesh_vtk is None:
             return

@@ -17,4 +17,5 @@ class PolyhedronMesh(Mesh):
 if __name__ == "__main__":
     #
     root=PolyhedronMesh()
-    root.load_from_vtk("test.vtk", 'float64')
+    root.load_from_vtk("D:/MLFEA/TAA/data/343c1.5/matMean/p0_0_solid_matMean_p20.vtk", 'float64')
+    root.save_by_vtk("D:/MLFEA/TAA/test_PolyhedronMesh.vtk")

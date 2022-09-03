@@ -15,6 +15,9 @@ class Tri3Mesh(PolygonMesh):
     def __init__(self):
         super().__init__()
         self.mesh_type='polygon_tri3'
+        self.node_normal=None
+        self.element_area=None
+        self.element_normal=None
 
     def update_node_normal(self):
         self.node_normal=Tri3Mesh.cal_node_normal(self.node, self.element)

@@ -16,6 +16,9 @@ class Quad4Mesh(PolygonMesh):
     def __init__(self):
         super().__init__()
         self.mesh_type='polygon_quad4'
+        self.node_normal=None
+        self.element_area=None
+        self.element_normal=None
 
     def update_node_normal(self):
         self.node_normal=Quad4Mesh.cal_node_normal(self.node, self.element)
@@ -72,6 +75,16 @@ class Quad4Mesh(PolygonMesh):
         temp=temp.clamp(min=1e-12)
         normal=cross_uv/temp
         return area, normal
+
+    @staticmethod
+    def cal_element_area(node, element):
+        area, normal= Quad4Mesh.cal_element_area_and_normal(node, element)
+        return area
+
+    @staticmethod
+    def cal_element_normal(node, element):
+        area, normal= Quad4Mesh.cal_element_area_and_normal(node, element)
+        return normal
 
     def sample_points_on_elements(self, n_points):
          return Quad4Mesh.sample_points(self.node, self.element, n_points)

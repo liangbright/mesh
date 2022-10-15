@@ -6,6 +6,7 @@ Created on Mon May 16 22:07:37 2022
 """
 import torch
 import numpy as np
+from copy import deepcopy
 from SaveMeshAsVTKFile import save_polygon_mesh_to_vtk, save_polyhedron_mesh_to_vtk
 _Flag_VTK_IMPORT_=False
 try:
@@ -30,9 +31,14 @@ class Mesh:
         self.node_data={} #e.g., {'stress':stress}, stress is Nx9 2D array
         self.element_data={} #e.g., {'stress':stress}, stress is Mx9 2D array
         self.mesh_data={} # it is only saved by torch
-        self.node_to_element_link=None
-        self.adj_node_link={'directed':None, 'undirected':None}
+        self.edge=None
+        self.adj_node_link=None
         self.adj_element_link=None
+        self.element_to_element_table=None
+        self.node_to_node_table=None
+        self.node_to_element_table=None
+        self.node_to_edge_table=None
+        self.edge_to_element_table=None
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
@@ -200,25 +206,30 @@ class Mesh:
         writer.SetFileName(filename)
         writer.Write()
 
-    def save_by_torch(self, filename):
-        torch.save({"mesh_type":self.mesh_type,
-                    "node":self.node,
-                    "element":self.element,
-                    "node_set":self.node_set,
-                    "element_set":self.element_set,
-                    "node_data":self.node_data,
-                    "element_data":self.element_data,
-                    "mesh_data":self.mesh_data,
-                    "node_name_to_index":self.node_name_to_index,
-                    "node_to_element_link":self.node_to_element_link,
-                    "adj_node_link":self.adj_node_link,
-                    "adj_element_link":self.adj_element_link},
-                   filename)
+    def save_by_torch(self, filename, save_link=False):
+        data={"mesh_type":self.mesh_type,
+              "node":self.node,
+              "element":self.element,
+              "node_set":self.node_set,
+              "element_set":self.element_set,
+              "node_data":self.node_data,
+              "element_data":self.element_data,
+              "mesh_data":self.mesh_data,
+              "node_name_to_index":self.node_name_to_index}
+        if save_link == True:
+            data["adj_node_link"]=self.adj_node_link,
+            data["adj_element_link"]=self.adj_element_link,
+            data["node_to_element_table"]=self.node_to_element_table,
+            data["node_to_edge_table"]=self.node_to_edge_table,
+            data["edge_to_element_table"]=self.edge_to_element_table
+        torch.save(data,  filename)
 
     def load_from_torch(self, filename):
         data=torch.load(filename, map_location="cpu")
         if "node" in data.keys():
             self.node=data["node"]
+            if not isinstance(self.node, torch.Tensor):
+                self.node=torch.tensor(self.node)
         else:
             raise ValueError("node is not in data.keys()")
         if "element" in data.keys():
@@ -237,46 +248,80 @@ class Mesh:
             self.mesh_data=data["mesh_data"]
         if "node_name_to_index" in data.keys():
             self.node_name_to_index=data["node_name_to_index"]
-        if "node_to_element_link" in data.keys():
-            self.node_to_element_link=data["node_to_element_link"]
+        if "node_to_element_table" in data.keys():
+            self.node_to_element_table=data["node_to_element_table"]
         if "adj_node_link" in data.keys():
             self.adj_node_link=data["adj_node_link"]
+            self.edge=self.adj_node_link
         if "adj_element_link" in data.keys():
             self.adj_element_link=data["adj_element_link"]
 
-    def build_adj_node_link(self):
-        #assume: nodes in an element are adjacent to each other
-        adj_node_link=[]
-        for m in range(0, len(self.element)):
-            e=self.element[m]
-            for j in range(0, len(e)):
-                for i in range(0, len(e)):
-                    if i != j:
-                        adj_node_link.append([e[j], e[i]])
-                        adj_node_link.append([e[i], e[j]])
-        adj_node_link=torch.tensor(adj_node_link, dtype=torch.int64)
-        adj_node_link=torch.unique(adj_node_link, dim=0, sorted=True)
-        self.adj_node_link['undirected']=adj_node_link
+    def copy(self, node, element, dtype=torch.float32, detach=True):
+        if isinstance(node, torch.Tensor):
+            self.node=node.clone()
+            if detach==True:
+                self.node=self.node.detach()
+        elif isinstance(node, np.ndarray):
+            self.node=torch.tensor(node.copy())
+        elif isinstance(node, tuple) or isinstance(node, list):
+            self.node=torch.tensor(node, dtype=dtype)
+        else:
+            raise NotImplementedError
+        if isinstance(element, torch.Tensor):
+            self.element=element.clone()
+            if detach==True:
+                self.element=self.element.detach()
+        elif isinstance(element, np.ndarray):
+            self.element=torch.tensor(element.copy(), dtype=torch.int64)
+        elif isinstance(element, tuple) or isinstance(element, list):
+            m_list=[]
+            for m in range(0, len(element)):
+                m_list.append(len(element[m]))
+            if max(m_list) == min(m_list):
+                self.element=torch.tensor(element, dtype=torch.int64)
+            else:
+                self.element=deepcopy(element)
+        else:
+            raise NotImplementedError
 
-    def build_node_to_element_link(self):
-        #do not do this: node_to_element_link=[[]]*self.node.shape[0]
+    def build_edge(self):
+        raise NotImplementedError
+
+    def build_adj_node_link(self):
+        raise NotImplementedError
+
+    def build_node_to_node_table(self):
+        #no self link
+        if self.edge is None:
+            self.build_edge()
+        node_to_node_table=[[] for _ in range(self.node.shape[0])]
+        for k in range(0, len(self.edge)):
+            idx0=int(self.edge[k,0])
+            idx1=int(self.edge[k,1])
+            if idx0 != idx1:
+                node_to_node_table[idx0].append(idx1)
+        self.node_to_node_table=node_to_node_table
+
+    def build_node_to_element_table(self):
+        #do not do this: node_to_element_table=[[]]*self.node.shape[0]
         # a=[[]]*2=[[],[]], and a[0] and a[1] are the same object
         # a=[[],[]], and a[0] and a[1] are two different objects
-        node_to_element_link=[[] for _ in range(self.node.shape[0])]
+        node_to_element_table=[[] for _ in range(self.node.shape[0])]
         element=self.element
         if isinstance(element, torch.Tensor):
             element=element.detach().cpu().numpy()
         for m in range(0, len(element)):
-            e=element[m]
-            for k in range(0, len(e)):
-                node_to_element_link[e[k]].append(m)
-        self.node_to_element_link=node_to_element_link
+            elm=element[m]
+            for k in range(0, len(elm)):
+                node_to_element_table[elm[k]].append(m)
+        self.node_to_element_table=node_to_element_table
 
-    def build_adj_element_link_n1(self):
-        self.build_node_to_element_link()
+    def build_adj_element_link_adj1(self):
+        if self.node_to_element_table is None:
+            self.build_node_to_element_table()
         adj_element_link=[]
-        for n in range(0, len(self.node_to_element_link)):
-            e_set=self.node_to_element_link[n]
+        for n in range(0, len(self.node_to_element_table)):
+            e_set=self.node_to_element_table[n]
             for m1 in range(0, len(e_set)):
                 for m2 in range(m1+1, len(e_set)):
                     eid1=e_set[m1]; eid2=e_set[m2]
@@ -286,9 +331,30 @@ class Mesh:
         adj_element_link=torch.unique(adj_element_link, dim=0, sorted=True)
         self.adj_element_link=adj_element_link
 
-    def build_adj_element_link(self, min_shared_nodes=1):
-        if min_shared_nodes == 1:
-            return self.build_adj_element_link_n1()
+    def build_adj_element_link_adj2(self):
+        if self.edge_to_element_table is None:
+            self.build_edge_to_element_table(adj=2)
+        adj_element_link=[]
+        for n in range(0, len(self.edge_to_element_table)):
+            e_set=self.edge_to_element_table[n]
+            for m1 in range(0, len(e_set)):
+                for m2 in range(m1+1, len(e_set)):
+                    eid1=e_set[m1]; eid2=e_set[m2]
+                    adj_element_link.append([eid1, eid2])
+                    adj_element_link.append([eid2, eid1])
+        adj_element_link=torch.tensor(adj_element_link, dtype=torch.int64)
+        adj_element_link=torch.unique(adj_element_link, dim=0, sorted=True)
+        self.adj_element_link=adj_element_link
+
+    def build_adj_element_link(self, adj):
+        #two elements are adj if they share at least adj node(s)
+        #no self link
+        if adj == 1:
+            #two elements are adj if they share at least one(adj) node
+            return self.build_adj_element_link_adj1()
+        elif adj == 2:
+            #two elements are adj if they share at least two(adj) nodes
+            return self.build_adj_element_link_adj2()
         #---------the code is very slow -------------------
         adj_element_link=[]
         element=self.element
@@ -300,19 +366,62 @@ class Mesh:
                 e_m=element[m]
                 temp=np.isin(e_n, e_m, assume_unique=True)
                 temp=np.sum(temp)
-                if temp >= min_shared_nodes:
+                if temp >= adj:
                     adj_element_link.append([n, m])
                     adj_element_link.append([m, n])
         adj_element_link=torch.tensor(adj_element_link, dtype=torch.int64)
         adj_element_link=torch.unique(adj_element_link, dim=0, sorted=True)
         self.adj_element_link=adj_element_link
+
+    def build_element_to_element_table(self, adj):
+        #no self link
+        if self.adj_element_link is None:
+            self.build_adj_element_link(adj=adj)
+        element_to_element_table=[[] for _ in range(len(self.element))]
+        for k in range(0, len(self.adj_element_link)):
+            link=self.adj_element_link[k]
+            idx0=int(link[0])
+            idx1=int(link[1])
+            if idx0 != idx1:
+                element_to_element_table[idx0].append(idx1)
+        self.element_to_element_table=element_to_element_table
+
+    def build_node_to_edge_table(self):
+        if self.edge is None:
+            self.build_edge()
+        node_to_edge_table=[[] for _ in range(self.edge.shape[0])]
+        for k in range(0, len(self.edge)):
+            node_to_edge_table[self.edge[k,0]].append(k)
+            node_to_edge_table[self.edge[k,1]].append(k)
+        self.node_to_edge_table=node_to_edge_table
+
+    def build_edge_to_element_table(self, adj):
+        #an edge is adj to an element if the one (adj=1) or two(adj=2) nodes of the egde belong to the element
+        if adj < 1 or adj > 2:
+            raise ValueError('adj can only be 1 or 2, adj='+str(adj))
+        if self.edge is None:
+            self.build_edge()
+        if self.node_to_element_table is None:
+            self.build_node_to_element_table()
+        edge_to_element_table=[]
+        for k in range(0, len(self.edge)):
+            elm_set0=self.node_to_element_table[self.edge[k,0]]
+            elm_set1=self.node_to_element_table[self.edge[k,1]]
+            if adj == 1:
+                elm_set=list(set(list(elm_set0)+list(elm_set1)))
+            elif adj == 2:
+                elm_set=list(np.intersect1d(elm_set0, elm_set1))
+            else:
+                raise ValueError("not possible")
+            edge_to_element_table.append(elm_set)
+        self.edge_to_element_table=edge_to_element_table
 #%%
 if __name__ == "__main__":
     #%%
     filename="D:/MLFEA/TAVR/FE/1908788_0_im_5_phase1_Root_solid_three_layers_aligned.vtk"
     root1=Mesh('polyhedron')
     root1.load_from_vtk(filename, dtype=torch.float32)
-    root1.build_node_to_element_link()
+    root1.build_node_to_element_table()
     #%%
     root1.save_by_vtk("test.vtk")
     #%%
@@ -321,11 +430,10 @@ if __name__ == "__main__":
     #%%
     import time
     t1=time.time()
-    root2.build_node_to_element_link()
+    root2.build_node_to_element_table()
     t2=time.time()
     print('t2-t1', t2-t1)
     #%%
-    import time
     t1=time.time()
     root2.build_adj_element_link()
     t2=time.time()

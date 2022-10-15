@@ -10,34 +10,35 @@ from torch_sparse import SparseTensor
 import numpy as np
 from PolygonMesh import PolygonMesh
 #%%
-class Tri3Mesh(PolygonMesh):
+class TriangleMesh(PolygonMesh):
     #3-node triangle element mesh
     def __init__(self):
         super().__init__()
-        self.mesh_type='polygon_tri3'
+        self.mesh_type='polygon_tri'
         self.node_normal=None
         self.element_area=None
         self.element_normal=None
 
     def update_node_normal(self):
-        self.node_normal=Tri3Mesh.cal_node_normal(self.node, self.element)
+        self.node_normal=TriangleMesh.cal_node_normal(self.node, self.element)
 
     @staticmethod
-    def cal_node_normal(node, element, element_normal=None):
+    def cal_node_normal(node, element, element_normal=None, normalization=True):
         if element_normal is None:
-            element_area, element_normal=Tri3Mesh.cal_element_area_and_normal(node, element)
+            element_area, element_normal=TriangleMesh.cal_element_area_and_normal(node, element)
         M=element.shape[0]
         e_normal=element_normal.view(M, 1, 3)
         e_normal=e_normal.expand(M, 3, 3)
         e_normal=e_normal.reshape(M*3, 3)
         N=node.shape[0]
         normal = torch_scatter.scatter(e_normal, element.view(-1), dim=0, dim_size=N, reduce="sum")
-        normal=normal/torch.norm(normal, p=2, dim=1, keepdim=True)
+        if normalization == True:
+            normal=normal/torch.norm(normal, p=2, dim=1, keepdim=True)
         normal=normal.contiguous()
         return normal
 
     def update_element_area_and_normal(self):
-         self.element_area, self.element_normal=Tri3Mesh.cal_element_area_and_normal(self.node, self.element)
+         self.element_area, self.element_normal=TriangleMesh.cal_element_area_and_normal(self.node, self.element)
 
     @staticmethod
     def cal_element_area_and_normal(node, element):
@@ -55,11 +56,11 @@ class Tri3Mesh(PolygonMesh):
         return area, normal
 
     def sample_points_on_elements(self, n_points):
-         return Tri3Mesh.sample_points(self.node, self.element, n_points)
+         return TriangleMesh.sample_points(self.node, self.element, n_points)
 
     @staticmethod
     def sample_points(node, element, n_points):
-        area, normal=Tri3Mesh.cal_element_area_and_normal(node, element)
+        area, normal=TriangleMesh.cal_element_area_and_normal(node, element)
         prob = area / area.sum()
         sample = torch.multinomial(prob.view(-1), n_points-len(element), replacement=True)
         #print("sample_points", area.shape, prob.shape, sample.shape)
@@ -74,28 +75,28 @@ class Tri3Mesh(PolygonMesh):
     def subdivide(self):
         #return a new mesh
         #add a node in the middle of each edge
-        if self.adj_node_link["directed"] is None:
-            self.build_adj_node_link(undirected=False)
-        x_j=self.node[self.adj_node_link["directed"][:,0]]
-        x_i=self.node[self.adj_node_link["directed"][:,1]]
+        if self.edge is None:
+            self.build_edge()
+        x_j=self.node[self.edge[:,0]]
+        x_i=self.node[self.edge[:,1]]
         nodeA=(x_j+x_i)/2
         #create new mesh
         node_new=torch.cat([self.node, nodeA], dim=0)
-        #adj matrix for nodeB
-        adj=SparseTensor(row=self.adj_node_link["directed"][:,0],
-                         col=self.adj_node_link["directed"][:,1],
+        #adj matrix for nodeA
+        adj=SparseTensor(row=self.edge[:,0],
+                         col=self.edge[:,1],
                          value=torch.arange(self.node.shape[0],
                                             self.node.shape[0]+nodeA.shape[0]),
                          sparse_sizes=(nodeA.shape[0], nodeA.shape[0]))
         element_new=[]
-        for m in range(0, self.element.shape[0]):
+        element=self.element.cpu().numpy()
+        for m in range(0, element.shape[0]):
             #     x2
             #    /  \
             #   x5-- x4
             #  / \  / \
             # x0--x3--x1
             #-----------
-            element=self.element.cpu().numpy()
             id0=element[m,0].item()
             id1=element[m,1].item()
             id2=element[m,2].item()
@@ -116,7 +117,7 @@ class Tri3Mesh(PolygonMesh):
             element_new.append([id3, id1, id4])
             element_new.append([id5, id4, id2])
         element_new=torch.tensor(element_new, dtype=torch.int64, device=self.element.device)
-        mesh_new=Tri3Mesh()
+        mesh_new=TriangleMesh()
         mesh_new.node=node_new
         mesh_new.element=element_new
         return mesh_new
@@ -126,14 +127,14 @@ class Tri3Mesh(PolygonMesh):
         node_idlist, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_new=self.node[node_idlist]
         element_new=element_out.view(-1,3)
-        mesh_new=Tri3Mesh()
+        mesh_new=TriangleMesh()
         mesh_new.node=node_new
         mesh_new.element=element_new
         return mesh_new
 #%%
 if __name__ == "__main__":
     filename="wall_tri.vtk"
-    wall=Tri3Mesh()
+    wall=TriangleMesh()
     wall.load_from_vtk(filename, 'float64')
     wall.update_node_normal()
     wall.node+=wall.node_normal

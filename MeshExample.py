@@ -1,8 +1,8 @@
 import torch
-from QuadMesh import Quad4Mesh as QuadMesh
-from HexahedronMesh import Hex8Mesh as HexMesh
+from QuadMesh import QuadMesh
+from HexahedronMesh import HexahedronMesh as HexMesh
 #%%
-def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):
+def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32, device=torch.device("cpu")):
     element=torch.zeros(((Nx-1)*(Ny-1), 4), dtype=torch.int64)
     grid=torch.zeros((Nx*Ny, 3), dtype=dtype)
     map=torch.zeros((Ny, Nx), dtype=torch.int64)
@@ -26,12 +26,12 @@ def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):
             element[id,2]=map[y+1,x+1]
             element[id,3]=map[y+1,x]
     grid_mesh=QuadMesh()
-    grid_mesh.node=grid
-    grid_mesh.element=element
-    grid_mesh.node_set['boundary']=boundary
+    grid_mesh.node=grid.to(device)
+    grid_mesh.element=element.to(device)
+    grid_mesh.node_set['boundary']=boundary.to(device)
     return grid_mesh
 #%%
-def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32):
+def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32, device=torch.device("cpu")):
     element=torch.zeros(((Nx-1)*(Ny-1)*(Nz-1), 8), dtype=torch.int64)
     grid=torch.zeros((Nx*Ny*Nz, 3), dtype=dtype)
     map=torch.zeros((Nz, Ny, Nx), dtype=dtype)
@@ -62,9 +62,9 @@ def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32):
                 element[id,6]=map[z+1,y+1,x+1]
                 element[id,7]=map[z+1,y+1,x]
     grid_mesh=HexMesh()
-    grid_mesh.node=grid
-    grid_mesh.element=element
-    grid_mesh.node_set['boundary']=boundary
+    grid_mesh.node=grid.to(device)
+    grid_mesh.element=element.to(device)
+    grid_mesh.node_set['boundary']=boundary.to(device)
     return grid_mesh
 #%%
 if __name__ == '__main__':

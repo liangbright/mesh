@@ -33,7 +33,9 @@ class TriangleMesh(PolygonMesh):
         N=node.shape[0]
         normal = torch_scatter.scatter(e_normal, element.view(-1), dim=0, dim_size=N, reduce="sum")
         if normalization == True:
-            normal=normal/torch.norm(normal, p=2, dim=1, keepdim=True)
+            normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
+            normal_norm=normal_norm.clamp(min=1e-12)
+            normal=normal/normal_norm
         normal=normal.contiguous()
         return normal
 

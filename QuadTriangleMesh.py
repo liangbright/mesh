@@ -1,12 +1,5 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun Oct  9 16:42:41 2022
-
-@author: liang
-"""
-
-# -*- coding: utf-8 -*-
-"""
 Created on Sat Mar 27 22:24:13 2021
 
 @author: liang
@@ -77,8 +70,8 @@ class QuadTriangleMesh(PolygonMesh):
         super().quad_to_tri()
         self.classify_element()
 
-    def copy(self, node, element):
-        super().copy(node, element)
+    def copy(self, node, element, dtype=None, detach=True):
+        super().copy(node, element, dtype, detach)
         self.classify_element()
 
     def update_node_normal(self):
@@ -91,7 +84,9 @@ class QuadTriangleMesh(PolygonMesh):
         if len(self.tri_element) > 0:
             normal_tri=TriangleMesh.cal_node_normal(self.node, self.tri_element, normalization=False)
         normal=normal_quad+normal_tri
-        normal=normal/torch.norm(normal, p=2, dim=1, keepdim=True)
+        normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
+        normal_norm=normal_norm.clamp(min=1e-12)
+        normal=normal/normal_norm
         normal=normal.contiguous()
         self.node_normal=normal
 

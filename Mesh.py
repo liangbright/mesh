@@ -31,7 +31,7 @@ class Mesh:
         self.node_data={} #e.g., {'stress':stress}, stress is Nx9 2D array
         self.element_data={} #e.g., {'stress':stress}, stress is Mx9 2D array
         self.mesh_data={} # it is only saved by torch
-        self.edge=None
+        self.edge=None #only one edge between two adj nodes
         self.adj_node_link=None
         self.adj_element_link=None
         self.element_to_element_table=None
@@ -256,15 +256,24 @@ class Mesh:
         if "adj_element_link" in data.keys():
             self.adj_element_link=data["adj_element_link"]
 
-    def copy(self, node, element, dtype=torch.float32, detach=True):
+    def copy(self, node, element, dtype=None, detach=True):
         if isinstance(node, torch.Tensor):
-            self.node=node.clone()
+            if dtype is None:
+                self.node=node.clone()
+            else:
+                self.node=node.clone().to(dtype)
             if detach==True:
                 self.node=self.node.detach()
         elif isinstance(node, np.ndarray):
-            self.node=torch.tensor(node.copy())
+            if dtype is None:
+                self.node=torch.tensor(node.copy())
+            else:
+                self.node=torch.tensor(node.copy(), dtype=dtype)
         elif isinstance(node, tuple) or isinstance(node, list):
-            self.node=torch.tensor(node, dtype=dtype)
+            if dtype is None:
+                self.node=torch.tensor(node, dtype=torch.float32)
+            else:
+                self.node=torch.tensor(node, dtype=dtype)
         else:
             raise NotImplementedError
         if isinstance(element, torch.Tensor):

@@ -34,7 +34,7 @@ def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32, device=torch.device("cpu"
 def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32, device=torch.device("cpu")):
     element=torch.zeros(((Nx-1)*(Ny-1)*(Nz-1), 8), dtype=torch.int64)
     grid=torch.zeros((Nx*Ny*Nz, 3), dtype=dtype)
-    map=torch.zeros((Nz, Ny, Nx), dtype=dtype)
+    map=torch.zeros((Nz, Ny, Nx), dtype=torch.int64)
     id=-1
     boundary=[]
     for z in range(0,Nz):
@@ -45,7 +45,7 @@ def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32, device=torch.device("c
                 grid[id,0]=x
                 grid[id,1]=y
                 grid[id,2]=z
-                if y==0 or y==Ny-1 or x==0 or x==Nx-1 or z==0 or z==Nz-1:
+                if z==0 or z==Nz-1 or y==0 or y==Ny-1 or x==0 or x==Nx-1:
                     boundary.append(id)
     boundary=torch.tensor(boundary, dtype=torch.int64)
     id=-1

@@ -59,16 +59,67 @@ class PolygonMesh(Mesh):
         #return index list of nodes on boundary
         if self.edge is None:
             self.build_edge()
-        if self.edge_to_element_table is None:
+        if self.edge_to_element_table["adj2"] is None:
             self.build_edge_to_element_table(adj=2)
         boundary=[]
         for k in range(0, len(self.edge)):
-            elm=self.edge_to_element_table[k]
+            elm=self.edge_to_element_table["adj2"][k]
             if len(elm) <= 1:
                 boundary.append(int(self.edge[k,0]))
                 boundary.append(int(self.edge[k,1]))
         boundary=np.unique(boundary)
         return boundary
+
+    def is_quad(self):
+        if isinstance(self.element, torch.Tensor):
+            if len(self.element[0]) == 4:
+                #this is QuadMesh
+                return True
+            else:
+                return False
+        m_list=[]
+        for m in range(0, len(self.element)):
+            m_list.append(len(self.element[m]))
+        m_min=min(m_list)
+        m_max=max(m_list)
+        if m_min == m_max == 4:
+            return True
+        else:
+            return False
+
+    def is_tri(self):
+        if isinstance(self.element, torch.Tensor):
+            if len(self.element[0]) == 3:
+                #this is TriangleMesh
+                return True
+            else:
+                return False
+        m_list=[]
+        for m in range(0, len(self.element)):
+            m_list.append(len(self.element[m]))
+        m_min=min(m_list)
+        m_max=max(m_list)
+        if m_min == m_max == 3:
+            return True
+        else:
+            return False
+
+    def is_quad_tri(self):
+        if isinstance(self.element, torch.Tensor):
+            if len(self.element[0]) == 3 or len(self.element[0]) == 4:
+                #this is QuadTriangleMesh
+                return True
+            else:
+                return False
+        m_list=[]
+        for m in range(0, len(self.element)):
+            m_list.append(len(self.element[m]))
+        m_min=min(m_list)
+        m_max=max(m_list)
+        if (m_min == m_max == 3) or (m_min == m_max == 4):
+            return True
+        else:
+            return False
 
     def quad_to_tri(self):
         if isinstance(self.element, torch.Tensor):
@@ -108,9 +159,10 @@ class PolygonMesh(Mesh):
         self.element=element_new
 #%%
 if __name__ == "__main__":
-    filename="F:/MLFEA/TAA/data/343c1.5/bav17_AortaModel_P0_best.vtk"
+    filename="D:/MLFEA/TAA/data/bav17_AortaModel_P0_best.pt"
     aorta=PolygonMesh()
-    aorta.load_from_vtk(filename, torch.float32)
+    #aorta.load_from_vtk(filename, "float32")
+    aorta.load_from_torch(filename)
     aorta.node_data={'node_data1':torch.rand((len(aorta.node), 6)),
                      'node_data2':torch.rand((len(aorta.node), 6))}
     aorta.element_data={'element_data1':torch.rand((len(aorta.element), 6)),

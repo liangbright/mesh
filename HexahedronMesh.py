@@ -17,7 +17,7 @@ class HexahedronMesh(PolyhedronMesh):
     #8-node C3D8 mesh
     def __init__(self):
         super().__init__()
-        self.mesh_type='polyhedron_hex8'
+        self.mesh_type='polyhedron_hex'
 
     def build_adj_node_link(self):
         adj_node_link=[]

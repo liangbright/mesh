@@ -24,7 +24,7 @@ class Mesh:
         self.mesh_type=mesh_type
         self.node=[] #Nx2 or Nx3
         self.element=[] #[e_1,...e_M], e1 is a list of node indexes in e1
-        self.element_type=None#None means all elements have the same type
+        self.element_type=None #None means all elements have the same type
         self.node_name_to_index={} #e.g., {'landmark1':10}
         self.node_set={} #e.g., {'set1':[0,1,2]}
         self.element_set={} #e.g., {'set1':[1,3,5]}
@@ -33,16 +33,16 @@ class Mesh:
         self.mesh_data={} # it is only saved by torch
         self.edge=None #only one edge between two adj nodes
         self.adj_node_link=None
-        self.adj_element_link=None
-        self.element_to_element_table=None
+        self.adj_element_link={} #{"adj1":None}
+        self.element_to_element_table={} #{"adj1":None}
         self.node_to_node_table=None
         self.node_to_element_table=None
         self.node_to_edge_table=None
-        self.edge_to_element_table=None
+        self.edge_to_element_table={"adj1":None, "adj2":None}
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
-            print("cannot import vtk")
+            print("cannot load from vtk")
             return
         if isinstance(dtype, str):
             if dtype == 'float32':
@@ -121,7 +121,7 @@ class Mesh:
 
     def convert_to_vtk(self):
         if _Flag_VTK_IMPORT_ == False:
-            print("cannot save vtk")
+            print("cannot convert to vtk")
             return
         Points_vtk = vtk.vtkPoints()
         Points_vtk.SetDataTypeToDouble()
@@ -217,6 +217,7 @@ class Mesh:
               "mesh_data":self.mesh_data,
               "node_name_to_index":self.node_name_to_index}
         if save_link == True:
+            data["edge"]=self.edge,
             data["adj_node_link"]=self.adj_node_link,
             data["adj_element_link"]=self.adj_element_link,
             data["node_to_element_table"]=self.node_to_element_table,
@@ -250,9 +251,10 @@ class Mesh:
             self.node_name_to_index=data["node_name_to_index"]
         if "node_to_element_table" in data.keys():
             self.node_to_element_table=data["node_to_element_table"]
+        if "edge" in data.keys():
+            self.edge=data["edge"]
         if "adj_node_link" in data.keys():
             self.adj_node_link=data["adj_node_link"]
-            self.edge=self.adj_node_link
         if "adj_element_link" in data.keys():
             self.adj_element_link=data["adj_element_link"]
 
@@ -338,14 +340,14 @@ class Mesh:
                     adj_element_link.append([eid2, eid1])
         adj_element_link=torch.tensor(adj_element_link, dtype=torch.int64)
         adj_element_link=torch.unique(adj_element_link, dim=0, sorted=True)
-        self.adj_element_link=adj_element_link
+        self.adj_element_link["adj1"]=adj_element_link
 
     def build_adj_element_link_adj2(self):
-        if self.edge_to_element_table is None:
+        if self.edge_to_element_table["adj2"] is None:
             self.build_edge_to_element_table(adj=2)
         adj_element_link=[]
         for n in range(0, len(self.edge_to_element_table)):
-            e_set=self.edge_to_element_table[n]
+            e_set=self.edge_to_element_table["adj2"][n]
             for m1 in range(0, len(e_set)):
                 for m2 in range(m1+1, len(e_set)):
                     eid1=e_set[m1]; eid2=e_set[m2]
@@ -353,11 +355,15 @@ class Mesh:
                     adj_element_link.append([eid2, eid1])
         adj_element_link=torch.tensor(adj_element_link, dtype=torch.int64)
         adj_element_link=torch.unique(adj_element_link, dim=0, sorted=True)
-        self.adj_element_link=adj_element_link
+        self.adj_element_link["adj2"]=adj_element_link
 
     def build_adj_element_link(self, adj):
         #two elements are adj if they share at least adj node(s)
         #no self link
+        if self.adj_element_link is None:
+            self.adj_element_link={}
+        if adj < 1:
+            raise ValueError('adj should be >=1, adj='+str(adj))
         if adj == 1:
             #two elements are adj if they share at least one(adj) node
             return self.build_adj_element_link_adj1()
@@ -380,20 +386,28 @@ class Mesh:
                     adj_element_link.append([m, n])
         adj_element_link=torch.tensor(adj_element_link, dtype=torch.int64)
         adj_element_link=torch.unique(adj_element_link, dim=0, sorted=True)
-        self.adj_element_link=adj_element_link
+        self.adj_element_link["adj"+str(adj)]=adj_element_link
 
     def build_element_to_element_table(self, adj):
         #no self link
-        if self.adj_element_link is None:
+        try:
+            adj_element_link=self.adj_element_link["adj"+str(adj)]
+        except:
             self.build_adj_element_link(adj=adj)
+            adj_element_link=self.adj_element_link["adj"+str(adj)]
+        if adj_element_link is None:
+            self.build_adj_element_link(adj=adj)
+            adj_element_link=self.adj_element_link["adj"+str(adj)]
         element_to_element_table=[[] for _ in range(len(self.element))]
-        for k in range(0, len(self.adj_element_link)):
-            link=self.adj_element_link[k]
+        for k in range(0, len(adj_element_link)):
+            link=adj_element_link[k]
             idx0=int(link[0])
             idx1=int(link[1])
             if idx0 != idx1:
                 element_to_element_table[idx0].append(idx1)
-        self.element_to_element_table=element_to_element_table
+        if self.element_to_element_table is None:
+            self.element_to_element_table={}
+        self.element_to_element_table["adj"+str(adj)]=element_to_element_table
 
     def build_node_to_edge_table(self):
         if self.edge is None:
@@ -406,6 +420,7 @@ class Mesh:
 
     def build_edge_to_element_table(self, adj):
         #an edge is adj to an element if the one (adj=1) or two(adj=2) nodes of the egde belong to the element
+        #if adj=1, then Polygon.find_boundary_node will fail
         if adj < 1 or adj > 2:
             raise ValueError('adj can only be 1 or 2, adj='+str(adj))
         if self.edge is None:
@@ -423,7 +438,12 @@ class Mesh:
             else:
                 raise ValueError("not possible")
             edge_to_element_table.append(elm_set)
-        self.edge_to_element_table=edge_to_element_table
+        if self.edge_to_element_table is None:
+            self.edge_to_element_table={"adj1":None, "adj2":None}
+        if adj == 1:
+            self.edge_to_element_table["adj1"]=edge_to_element_table
+        if adj == 2:
+            self.edge_to_element_table["adj2"]=edge_to_element_table
 #%%
 if __name__ == "__main__":
     #%%
@@ -444,6 +464,6 @@ if __name__ == "__main__":
     print('t2-t1', t2-t1)
     #%%
     t1=time.time()
-    root2.build_adj_element_link()
+    root2.build_adj_element_link(adj=1)
     t2=time.time()
     print('t2-t1', t2-t1)

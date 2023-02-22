@@ -65,7 +65,7 @@ class HexahedronMesh(PolyhedronMesh):
                 edge.append([id1, id2])
             else:
                 edge.append([id2, id1])
-            if id2 > id3:
+            if id2 < id3:
                 edge.append([id2, id3])
             else:
                 edge.append([id3, id2])

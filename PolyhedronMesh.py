@@ -13,6 +13,12 @@ class PolyhedronMesh(Mesh):
     def __init__(self):
         super().__init__('polyhedron')
 
+    def get_sub_mesh(self, element_idx_list):
+        sub_mesh=super().get_sub_mesh(element_idx_list)
+        new_mesh=PolyhedronMesh()
+        new_mesh.node=sub_mesh.node
+        new_mesh.element=sub_mesh.element
+        return new_mesh
 #%%
 if __name__ == "__main__":
     #

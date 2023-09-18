@@ -17,7 +17,7 @@ class HexahedronMesh(PolyhedronMesh):
     #8-node C3D8 mesh
     def __init__(self):
         super().__init__()
-        self.mesh_type='polyhedron_hex'
+        self.mesh_type='polyhedron_hex8'
 
     def build_adj_node_link(self):
         adj_node_link=[]
@@ -120,9 +120,9 @@ class HexahedronMesh(PolyhedronMesh):
         #draw a 3D figure and code this...
         pass
 
-    def get_sub_mesh(self, element_id_list):
+    def get_sub_mesh(self, element_idx_list):
         #element.shape (M,8)
-        element_sub=self.element[element_id_list]
+        element_sub=self.element[element_idx_list]
         node_idlist, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_out=self.node[node_idlist]
         element_out=element_out.view(-1,8)

@@ -14,7 +14,7 @@ class TriangleMesh(PolygonMesh):
     #3-node triangle element mesh
     def __init__(self):
         super().__init__()
-        self.mesh_type='polygon_tri'
+        self.mesh_type='polygon_tri3'
         self.node_normal=None
         self.element_area=None
         self.element_normal=None
@@ -50,7 +50,7 @@ class TriangleMesh(PolygonMesh):
         #   x2
         #  /  \
         # x0--x1
-        temp1=torch.cross(x1 - x0, x2- x0)
+        temp1=torch.cross(x1 - x0, x2- x0, dim=-1)
         temp2=torch.norm(temp1, p=2, dim=1, keepdim=True)
         area=0.5*temp2.abs()
         temp2=temp2.clamp(min=1e-12)
@@ -124,8 +124,8 @@ class TriangleMesh(PolygonMesh):
         mesh_new.element=element_new
         return mesh_new
 
-    def get_sub_mesh(self, element_id_list):
-        element_sub=self.element[element_id_list]
+    def get_sub_mesh(self, element_idx_list):
+        element_sub=self.element[element_idx_list]
         node_idlist, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_new=self.node[node_idlist]
         element_new=element_out.view(-1,3)

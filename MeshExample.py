@@ -1,6 +1,32 @@
 import torch
+import numpy as np
 from QuadMesh import QuadMesh
 from HexahedronMesh import HexahedronMesh as HexMesh
+#%%
+def create_quad_cylinder_mesh(n_rings, n_points_per_ring, dtype=torch.float32, device=torch.device("cpu")):
+    theta=2*np.pi/n_points_per_ring
+    node=np.zeros((n_rings*n_points_per_ring, 3))
+    k=-1
+    for n in range(0, n_rings):
+        for m in range(0, n_points_per_ring):
+            x=np.cos(theta*m)
+            y=np.sin(theta*m)
+            z=n/n_rings
+            k=k+1
+            node[k,0]=x
+            node[k,1]=y
+            node[k,2]=z
+    element=[]
+    for n in range(1, n_rings):
+        idxA=np.arange((n-1)*n_points_per_ring, n*n_points_per_ring)
+        idxB=np.arange(n*n_points_per_ring, (n+1)*n_points_per_ring)
+        for i in range(0, n_points_per_ring-1):
+            element.append([idxA[i], idxA[i+1], idxB[i+1], idxB[i]])
+        element.append([idxA[n_points_per_ring-1], idxA[0], idxB[0], idxB[n_points_per_ring-1]])
+    cylinder=QuadMesh()
+    cylinder.node=torch.tensor(node, dtype=dtype, device=device)
+    cylinder.element=torch.tensor(element, dtype=torch.int64, device=device)
+    return cylinder
 #%%
 def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32, device=torch.device("cpu")):
     element=torch.zeros(((Nx-1)*(Ny-1), 4), dtype=torch.int64)

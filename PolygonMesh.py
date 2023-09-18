@@ -13,8 +13,8 @@ class PolygonMesh(Mesh):
     def __init__(self):
         super().__init__('polygon')
 
-    def build_adj_node_link(self):
-        adj_node_link=[]
+    def build_node_adj_link(self):
+        node_adj_link=[]
         for m in range(0, len(self.element)):
             elm=self.element[m]
             for k in range(0, len(elm)):
@@ -22,11 +22,11 @@ class PolygonMesh(Mesh):
                     a=int(elm[k]); b=int(elm[k+1])
                 else:
                     a=int(elm[k]); b=int(elm[0])
-                adj_node_link.append([a, b])
-                adj_node_link.append([b, a])
-        adj_node_link=torch.tensor(adj_node_link, dtype=torch.int64)
-        adj_node_link=torch.unique(adj_node_link, dim=0, sorted=True)
-        self.adj_node_link=adj_node_link
+                node_adj_link.append([a, b])
+                node_adj_link.append([b, a])
+        node_adj_link=torch.tensor(node_adj_link, dtype=torch.int64)
+        node_adj_link=torch.unique(node_adj_link, dim=0, sorted=True)
+        self.node_adj_link=node_adj_link
 
     def build_edge(self):
         edge=[]
@@ -59,11 +59,11 @@ class PolygonMesh(Mesh):
         #return index list of nodes on boundary
         if self.edge is None:
             self.build_edge()
-        if self.edge_to_element_table["adj2"] is None:
-            self.build_edge_to_element_table(adj=2)
+        if self.edge_to_element_adj_table["adj2"] is None:
+            self.build_edge_to_element_adj_table(adj=2)
         boundary=[]
         for k in range(0, len(self.edge)):
-            elm=self.edge_to_element_table["adj2"][k]
+            elm=self.edge_to_element_adj_table["adj2"][k]
             if len(elm) <= 1:
                 boundary.append(int(self.edge[k,0]))
                 boundary.append(int(self.edge[k,1]))
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     #%%
     from time import time
     t0=time()
-    aorta.build_adj_node_link()
+    aorta.build_node_adj_link()
     #aorta.build_edge()
     t1=time()
     aorta.build_node_to_edge_table()

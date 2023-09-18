@@ -17,12 +17,12 @@ def TracePolygonMeshBoundaryCurve(mesh, node_idx):
     if node_idx not in boundary:
         return BoundaryCurve
     #---------
-    mesh.build_node_to_node_table()
-    node_to_node_table=mesh.node_to_node_table
+    mesh.build_node_adj_table()
+    node_adj_table=mesh.node_adj_table
     idx_next=node_idx
     while True:
         BoundaryCurve.append(idx_next)
-        idx_list_next=node_to_node_table[idx_next]
+        idx_list_next=node_adj_table[idx_next]
         flag=False
         for k in range(0, len(idx_list_next)):
             idx_next=idx_list_next[k]

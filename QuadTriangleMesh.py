@@ -17,7 +17,7 @@ class QuadTriangleMesh(PolygonMesh):
 
     def __init__(self):
         super().__init__()
-        self.mesh_type='polygon_quad_tri'
+        self.mesh_type='polygon_quad4_tri3'
         self.node_normal=None
         self.element_area=None
         self.element_normal=None

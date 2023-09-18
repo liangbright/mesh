@@ -13,14 +13,14 @@ def ReordeNodeInElement(mesh, ref_element_id, verbose=False):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     #
-    mesh.build_element_to_element_table(adj=2)
-    element_to_element_table=mesh.element_to_element_table["adj2"]
+    mesh.build_element_adj_table(adj=2)
+    element_adj_table=mesh.element_adj_table["adj2"]
     good_element_list=[ref_element_id]
     active_element_list=[ref_element_id]
     while True:
         next_active_element_list=[]
         for elm_id in active_element_list:
-            adj_elm_idxlist=element_to_element_table[elm_id]
+            adj_elm_idxlist=element_adj_table[elm_id]
             adj_elm_idxlist=list(set(adj_elm_idxlist)-set(good_element_list))
             next_active_element_list.extend(adj_elm_idxlist)
             for adj_elm_id in adj_elm_idxlist:

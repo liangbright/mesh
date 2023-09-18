@@ -15,7 +15,7 @@ class QuadMesh(PolygonMesh):
 
     def __init__(self):
         super().__init__()
-        self.mesh_type='polygon_quad'
+        self.mesh_type='polygon_quad4'
         self.node_normal=None
         self.element_area=None
         self.element_normal=None
@@ -32,13 +32,13 @@ class QuadMesh(PolygonMesh):
         # x3--x2
         # |   |
         # x0--x1
-        normal0=torch.cross(x1-x0, x3-x0)
+        normal0=torch.cross(x1-x0, x3-x0, dim=-1)
         normal0=normal0/torch.norm(normal0, p=2, dim=1, keepdim=True)
-        normal1=torch.cross(x2-x1, x0-x1)
+        normal1=torch.cross(x2-x1, x0-x1, dim=-1)
         normal1=normal1/torch.norm(normal1, p=2, dim=1, keepdim=True)
-        normal2=torch.cross(x3-x2, x1-x2)
+        normal2=torch.cross(x3-x2, x1-x2, dim=-1)
         normal2=normal2/torch.norm(normal2, p=2, dim=1, keepdim=True)
-        normal3=torch.cross(x0-x3, x2-x3)
+        normal3=torch.cross(x0-x3, x2-x3, dim=-1)
         normal3=normal3/torch.norm(normal3, p=2, dim=1, keepdim=True)
         M=element.shape[0]
         N=node.shape[0]
@@ -70,7 +70,7 @@ class QuadMesh(PolygonMesh):
         # x0--x1
         dxdu=(1/4)*((x1+x2)-(x0+x3))
         dxdv=(1/4)*((x2+x3)-(x0+x1))
-        cross_uv=torch.cross(dxdu, dxdv)
+        cross_uv=torch.cross(dxdu, dxdv, dim=-1)
         temp=torch.norm(cross_uv, p=2, dim=1, keepdim=True)
         area=4*temp.abs()
         temp=temp.clamp(min=1e-12)
@@ -127,7 +127,8 @@ class QuadMesh(PolygonMesh):
                                             self.node.shape[0]+nodeA.shape[0]+nodeB.shape[0]),
                          sparse_sizes=(nodeB.shape[0], nodeB.shape[0]))
         element_new=[]
-        element=self.element.cpu().numpy()
+        if torch.is_tensor(self.element):
+            element=self.element.cpu().numpy()
         for m in range(0, element.shape[0]):
             # x3--x6--x2
             # |   |   |

@@ -111,6 +111,9 @@ def save_polyhedron_mesh_to_vtk(mesh, filename):
         elif n_nodes == 8:
             #cell_type=vtk.VTK_HEXAHEDRON
             out.append('12'+'\n')
+        elif n_nodes == 10:
+            out.append('24'+'\n')
+            #cell_type=vtk.TK_QUADRATIC_TETRA
         else:
             #cell_type=vtk.VTK_POLYHEDRON
             out.append('42'+'\n')

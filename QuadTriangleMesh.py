@@ -4,6 +4,7 @@ Created on Sat Mar 27 22:24:13 2021
 
 @author: liang
 """
+import numpy as np
 import torch
 import torch_scatter
 from torch_sparse import SparseTensor
@@ -15,8 +16,8 @@ from copy import deepcopy
 class QuadTriangleMesh(PolygonMesh):
     #element could be quad or triangle
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, node=None, element=None, dtype=torch.float32):
+        super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polygon_quad4_tri3'
         self.node_normal=None
         self.element_area=None
@@ -80,9 +81,15 @@ class QuadTriangleMesh(PolygonMesh):
         normal_quad=0
         if len(self.quad_element) > 0:
             normal_quad=QuadMesh.cal_node_normal(self.node, self.quad_element, normalization=False)
+            error=torch.isnan(normal_quad).sum()
+            if error > 0:
+                print("error: nan in normal_quad @ QuadTriangleMesh:update_node_normal")
         normal_tri=0
         if len(self.tri_element) > 0:
             normal_tri=TriangleMesh.cal_node_normal(self.node, self.tri_element, normalization=False)
+            error=torch.isnan(normal_tri).sum()
+            if error > 0:
+                print("error: nan in normal_tri @ QuadTriangleMesh:update_node_normal")
         normal=normal_quad+normal_tri
         normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
         normal_norm=normal_norm.clamp(min=1e-12)

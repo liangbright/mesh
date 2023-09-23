@@ -12,15 +12,16 @@ from PolygonMesh import PolygonMesh
 #%%
 class TriangleMesh(PolygonMesh):
     #3-node triangle element mesh
-    def __init__(self):
-        super().__init__()
+    def __init__(self, node=None, element=None, dtype=torch.float32):
+        super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polygon_tri3'
         self.node_normal=None
         self.element_area=None
         self.element_normal=None
 
     def update_node_normal(self):
-        self.node_normal=TriangleMesh.cal_node_normal(self.node, self.element)
+        self.element_area, self.element_normal=TriangleMesh.cal_element_area_and_normal(self.node, self.element)
+        self.node_normal=TriangleMesh.cal_node_normal(self.node, self.element, self.element_normal)
 
     @staticmethod
     def cal_node_normal(node, element, element_normal=None, normalization=True):
@@ -31,13 +32,13 @@ class TriangleMesh(PolygonMesh):
         e_normal=e_normal.expand(M, 3, 3)
         e_normal=e_normal.reshape(M*3, 3)
         N=node.shape[0]
-        normal = torch_scatter.scatter(e_normal, element.view(-1), dim=0, dim_size=N, reduce="sum")
+        node_normal = torch_scatter.scatter(e_normal, element.view(-1), dim=0, dim_size=N, reduce="sum")
         if normalization == True:
-            normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
+            normal_norm=torch.norm(node_normal, p=2, dim=1, keepdim=True)
             normal_norm=normal_norm.clamp(min=1e-12)
-            normal=normal/normal_norm
-        normal=normal.contiguous()
-        return normal
+            node_normal=node_normal/normal_norm
+        node_normal=node_normal.contiguous()
+        return node_normal
 
     def update_element_area_and_normal(self):
          self.element_area, self.element_normal=TriangleMesh.cal_element_area_and_normal(self.node, self.element)
@@ -50,6 +51,7 @@ class TriangleMesh(PolygonMesh):
         #   x2
         #  /  \
         # x0--x1
+        #normal is undefined if area is 0
         temp1=torch.cross(x1 - x0, x2- x0, dim=-1)
         temp2=torch.norm(temp1, p=2, dim=1, keepdim=True)
         area=0.5*temp2.abs()

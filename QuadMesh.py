@@ -13,8 +13,8 @@ from TriangleMesh import TriangleMesh
 class QuadMesh(PolygonMesh):
     #4-node quad element mesh
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, node=None, element=None, dtype=torch.float32):
+        super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polygon_quad4'
         self.node_normal=None
         self.element_area=None
@@ -32,6 +32,7 @@ class QuadMesh(PolygonMesh):
         # x3--x2
         # |   |
         # x0--x1
+        #normal could be nan if xa==xb (e.g., x0 == x1)
         normal0=torch.cross(x1-x0, x3-x0, dim=-1)
         normal0=normal0/torch.norm(normal0, p=2, dim=1, keepdim=True)
         normal1=torch.cross(x2-x1, x0-x1, dim=-1)
@@ -47,6 +48,9 @@ class QuadMesh(PolygonMesh):
                               normal2.view(M,1,3),
                               normal3.view(M,1,3)], dim=1)
         normal=torch_scatter.scatter(normal0123.view(-1,3), element.view(-1), dim=0, dim_size=N, reduce="sum")
+        error=torch.isnan(normal).sum()
+        if error > 0:
+            print("error: nan in normal_quad @ QuadMesh:cal_node_normal")
         if normalization == True:
             normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
             normal_norm=normal_norm.clamp(min=1e-12)

@@ -13,8 +13,8 @@ from PolyhedronMesh import PolyhedronMesh
 #%%
 class TetrahedronMesh(PolyhedronMesh):
     #4-node C3D4/TET4 mesh
-    def __init__(self):
-        super().__init__()
+    def __init__(self, node=None, element=None, dtype=torch.float32):
+        super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polyhedron_tet4'
 
     def build_node_adj_link(self):

@@ -176,7 +176,7 @@ class Mesh:
             mesh_vtk.GetCellData().AddArray(vtk_array)
         return mesh_vtk
 
-    def save_by_vtk(self, filename, ascii=True, vtk42=True, use_vtk=True):
+    def save_as_vtk(self, filename, ascii=True, vtk42=True, use_vtk=True):
         if _Flag_VTK_IMPORT_ == False or use_vtk == False:
             if 'polyhedron' in self.mesh_type:
                 save_polyhedron_mesh_to_vtk(self, filename)
@@ -210,7 +210,7 @@ class Mesh:
         writer.SetFileName(filename)
         writer.Write()
 
-    def save_by_torch(self, filename, save_link=False):
+    def save_as_torch(self, filename, save_link=False):
         data={"mesh_type":self.mesh_type,
               "node":self.node,
               "element":self.element,
@@ -450,19 +450,18 @@ class Mesh:
         if adj == 2:
             self.edge_to_element_adj_table["adj2"]=edge_to_element_adj_table
 
-    def _elm_to_list(self, elm):
-        #elm is self.element[m]
-        if isinstance(elm, list):
-            pass
-        elif isinstance(elm, torch.Tensor):
-            elm=elm.cpu().numpy().tolist()
-        elif isinstance(elm, np.ndarray):
-            elm=elm.tolist()
-        elif isinstance(elm, tuple):
-            elm=list(elm)
+    def copy_to_list(self, x):
+        if isinstance(x, list):
+            y=deepcopy(x)
+        elif isinstance(x, torch.Tensor):
+            y=x.cpu().numpy().tolist()
+        elif isinstance(x, np.ndarray):
+            y=x.tolist()
+        elif isinstance(x, tuple):
+            y=list(x)
         else:
             raise ValueError('unsupported type')
-        return elm
+        return y
 
     def get_sub_mesh(self, element_idx_list):
         #this function is slow: ony use it if the mesh has different types of elements
@@ -470,7 +469,7 @@ class Mesh:
         used_old_idx_list=[]
         for m in range(0, len(element_idx_list)):
             elm=self.element[element_idx_list[m]]
-            elm=self._elm_to_list(elm)
+            elm=self.copy_to_list(elm)
             new_element.append(elm)
             used_old_idx_list.extend(elm)
         used_old_idx_list=np.unique(used_old_idx_list)

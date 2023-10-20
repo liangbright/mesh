@@ -32,7 +32,7 @@ class PolygonMesh(Mesh):
             elif isinstance(element,  torch.Tensor):
                   pass
             else:
-                raise ValueError("unkown data type of node")
+                raise ValueError("unkown data type of element")
             self.element=element
 
     def build_node_adj_link(self):
@@ -68,6 +68,8 @@ class PolygonMesh(Mesh):
         self.edge=edge
 
     def update_edge_length(self):
+        if self.edge is None:
+            self.build_edge()
         self.edge_length=PolygonMesh.cal_edge_length(self.node, self.edge)
 
     @staticmethod

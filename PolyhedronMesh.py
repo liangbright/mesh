@@ -33,7 +33,7 @@ class PolyhedronMesh(Mesh):
             elif isinstance(element,  torch.Tensor):
                   pass
             else:
-                raise ValueError("unkown data type of node")
+                raise ValueError("unkown data type of element")
             self.element=element
 
     def get_sub_mesh(self, element_idx_list):

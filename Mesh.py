@@ -34,11 +34,11 @@ class Mesh:
         self.edge=None #only one edge between two adj nodes
         self.node_adj_link=None
         self.node_adj_table=None
-        self.element_adj_link={} #{"adj1":None}
-        self.element_adj_table={} #{"adj1":None}
+        self.element_adj_link=None  #{"adj1":[...], "adj2":[...], "adj3":[...], ...}
+        self.element_adj_table=None #{"adj1":[...], "adj2":[...], "adj3":[...], ...}
         self.node_to_element_adj_table=None
         self.node_to_edge_adj_table=None
-        self.edge_to_element_adj_table={"adj1":None, "adj2":None}
+        self.edge_to_element_adj_table=None #{"adj1":[...], "adj2":[...]}
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
@@ -299,6 +299,29 @@ class Mesh:
         else:
             raise NotImplementedError
 
+    def copy_to_list(self, x):
+        if isinstance(x, list):
+            y=deepcopy(x)
+        elif isinstance(x, torch.Tensor):
+            y=x.cpu().numpy().tolist()
+        elif isinstance(x, np.ndarray):
+            y=x.tolist()
+        elif isinstance(x, tuple):
+            y=list(x)
+        else:
+            raise ValueError('unsupported type')
+        return y
+
+    def copy_element(self, object_type):
+        element=self.copy_to_list(self.element)
+        if object_type == 'list':
+            pass
+        elif object_type == 'numpy':
+            element=np.array(element)
+        elif object_type == 'torch':
+            element=torch.tensor(element)
+        return element
+
     def build_edge(self):
         raise NotImplementedError
 
@@ -345,6 +368,8 @@ class Mesh:
                     element_adj_link.append([eid2, eid1])
         element_adj_link=torch.tensor(element_adj_link, dtype=torch.int64)
         element_adj_link=torch.unique(element_adj_link, dim=0, sorted=True)
+        if self.element_adj_link is None:
+            self.element_adj_link={}
         self.element_adj_link["adj1"]=element_adj_link
 
     def build_element_adj_link_adj2(self):
@@ -360,13 +385,13 @@ class Mesh:
                     element_adj_link.append([eid2, eid1])
         element_adj_link=torch.tensor(element_adj_link, dtype=torch.int64)
         element_adj_link=torch.unique(element_adj_link, dim=0, sorted=True)
+        if self.element_adj_link is None:
+            self.element_adj_link={}
         self.element_adj_link["adj2"]=element_adj_link
 
     def build_element_adj_link(self, adj):
         #two elements are adj if they share at least adj node(s)
         #no self link
-        if self.element_adj_link is None:
-            self.element_adj_link={}
         if adj < 1:
             raise ValueError('adj should be >=1, adj='+str(adj))
         if adj == 1:
@@ -391,10 +416,13 @@ class Mesh:
                     element_adj_link.append([m, n])
         element_adj_link=torch.tensor(element_adj_link, dtype=torch.int64)
         element_adj_link=torch.unique(element_adj_link, dim=0, sorted=True)
+        if self.element_adj_link is None:
+            self.element_adj_link={}
         self.element_adj_link["adj"+str(adj)]=element_adj_link
 
     def build_element_adj_table(self, adj):
         #no self link
+        element_adj_link=None
         try:
             element_adj_link=self.element_adj_link["adj"+str(adj)]
         except:
@@ -444,24 +472,11 @@ class Mesh:
                 raise ValueError("not possible")
             edge_to_element_adj_table.append(elm_set)
         if self.edge_to_element_adj_table is None:
-            self.edge_to_element_adj_table={"adj1":None, "adj2":None}
+            self.edge_to_element_adj_table={}
         if adj == 1:
-            self.edge_to_element_adj_table["adj1"]=edge_to_element_adj_table
+            self.edge_to_element_adj_table['adj1']=edge_to_element_adj_table
         if adj == 2:
-            self.edge_to_element_adj_table["adj2"]=edge_to_element_adj_table
-
-    def copy_to_list(self, x):
-        if isinstance(x, list):
-            y=deepcopy(x)
-        elif isinstance(x, torch.Tensor):
-            y=x.cpu().numpy().tolist()
-        elif isinstance(x, np.ndarray):
-            y=x.tolist()
-        elif isinstance(x, tuple):
-            y=list(x)
-        else:
-            raise ValueError('unsupported type')
-        return y
+            self.edge_to_element_adj_table['adj2']=edge_to_element_adj_table
 
     def get_sub_mesh(self, element_idx_list):
         #this function is slow: ony use it if the mesh has different types of elements

@@ -10,17 +10,27 @@ from copy import deepcopy
 from Mesh import Mesh
 #%%
 class PolygonMesh(Mesh):
-    def __init__(self, node=None, element=None, dtype=torch.float32):
+    def __init__(self, node=None, element=None, dtype=None):
         super().__init__('polygon')
         if node is not None:
             if isinstance(node, list):
-                node=torch.tensor(node, dtype=dtype)
+                if dtype is not None:
+                    node=torch.tensor(node, dtype=dtype)
+                else:
+                    node=torch.tensor(node, dtype=torch.float32)
             elif isinstance(node, np.ndarray):
-                node=torch.tensor(node, dtype=dtype)
+                if dtype is not None:
+                    node=torch.tensor(node, dtype=dtype)
+                else:
+                    if node.dtype == np.float64:
+                        node=torch.tensor(node, dtype=torch.float64)
+                    else:
+                        node=torch.tensor(node, dtype=torch.float32)
             elif isinstance(node,  torch.Tensor):
-                pass
+                if dtype is not None:
+                    node=node.to(dtype)
             else:
-                raise ValueError("unkown data type of node")
+                raise ValueError("unkown object type of node")
             self.node=node
 
         if element is not None:
@@ -32,7 +42,7 @@ class PolygonMesh(Mesh):
             elif isinstance(element,  torch.Tensor):
                   pass
             else:
-                raise ValueError("unkown data type of element")
+                raise ValueError("unkown object type of element")
             self.element=element
 
     def build_node_adj_link(self):
@@ -83,15 +93,18 @@ class PolygonMesh(Mesh):
         #return index list of nodes on boundary
         if self.edge is None:
             self.build_edge()
-        if self.edge_to_element_adj_table["adj2"] is None:
+        try:
+            edge_to_element_adj_table=self.edge_to_element_adj_table["adj2"]
+        except:
             self.build_edge_to_element_adj_table(adj=2)
+            edge_to_element_adj_table=self.edge_to_element_adj_table["adj2"]
         boundary=[]
         for k in range(0, len(self.edge)):
-            elm=self.edge_to_element_adj_table["adj2"][k]
+            elm=edge_to_element_adj_table[k]
             if len(elm) <= 1:
                 boundary.append(int(self.edge[k,0]))
                 boundary.append(int(self.edge[k,1]))
-        boundary=np.unique(boundary)
+        boundary=np.unique(boundary).tolist()
         return boundary
 
     def is_quad(self):
@@ -150,12 +163,12 @@ class PolygonMesh(Mesh):
             if len(self.element[0]) == 3:
                 #this is TriangleMesh
                 return
-        element=self.element
         element_new=[]
         m_list=[]
-        for m in range(0, len(element)):
-            elm=element[m]
+        for m in range(0, len(self.element)):
+            elm=self.copy_to_list(self.element[m])
             if len(elm) == 4:
+                #-----------
                 # x3------x2
                 # |       |
                 # |       |
@@ -179,8 +192,16 @@ class PolygonMesh(Mesh):
                 element_new.append(elm)
                 m_list.append(len(elm))
         if min(m_list) == max(m_list):
-            element_new=torch.tensor(element_new, dtype=torch.int64)
+            if isinstance(self.element, torch.Tensor):
+                element_new=torch.tensor(element_new, dtype=torch.int64, device=self.element.device)
+            else:
+                element_new=torch.tensor(element_new, dtype=torch.int64)
         self.element=element_new
+
+    def get_sub_mesh(self, element_idx_list):
+        new_mesh=super().get_sub_mesh(element_idx_list)
+        new_mesh=PolygonMesh(new_mesh.node, new_mesh.element)
+        return new_mesh
 #%%
 if __name__ == "__main__":
     filename="D:/MLFEA/TAA/data/bav17_AortaModel_P0_best.pt"

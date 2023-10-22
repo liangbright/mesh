@@ -10,18 +10,28 @@ from Mesh import Mesh
 #%%
 class PolyhedronMesh(Mesh):
     # use this class to handle mixture of tetra and hex elements
-    def __init__(self, node=None, element=None, dtype=torch.float32):
+    def __init__(self, node=None, element=None, dtype=None):
         super().__init__('polyhedron')
 
         if node is not None:
             if isinstance(node, list):
-                node=torch.tensor(node, dtype=dtype)
+                if dtype is not None:
+                    node=torch.tensor(node, dtype=dtype)
+                else:
+                    node=torch.tensor(node, dtype=torch.float32)
             elif isinstance(node, np.ndarray):
-                node=torch.tensor(node, dtype=dtype)
+                if dtype is not None:
+                    node=torch.tensor(node, dtype=dtype)
+                else:
+                    if node.dtype == np.float64:
+                        node=torch.tensor(node, dtype=torch.float64)
+                    else:
+                        node=torch.tensor(node, dtype=torch.float32)
             elif isinstance(node,  torch.Tensor):
-                pass
+                if dtype is not None:
+                    node=node.to(dtype)
             else:
-                raise ValueError("unkown data type of node")
+                raise ValueError("unkown object type of node")
             self.node=node
 
         if element is not None:
@@ -33,14 +43,12 @@ class PolyhedronMesh(Mesh):
             elif isinstance(element,  torch.Tensor):
                   pass
             else:
-                raise ValueError("unkown data type of element")
+                raise ValueError("unkown object type of element")
             self.element=element
 
     def get_sub_mesh(self, element_idx_list):
-        sub_mesh=super().get_sub_mesh(element_idx_list)
-        new_mesh=PolyhedronMesh()
-        new_mesh.node=sub_mesh.node
-        new_mesh.element=sub_mesh.element
+        new_mesh=super().get_sub_mesh(element_idx_list)
+        new_mesh=PolyhedronMesh(new_mesh.node, new_mesh.element)
         return new_mesh
 #%%
 if __name__ == "__main__":

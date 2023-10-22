@@ -13,7 +13,7 @@ from PolyhedronMesh import PolyhedronMesh
 #%%
 class TetrahedronMesh(PolyhedronMesh):
     #4-node C3D4/TET4 mesh
-    def __init__(self, node=None, element=None, dtype=torch.float32):
+    def __init__(self, node=None, element=None, dtype=None):
         super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polyhedron_tet4'
 
@@ -83,9 +83,7 @@ class TetrahedronMesh(PolyhedronMesh):
         node_idlist, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_out=self.node[node_idlist]
         element_out=element_out.view(-1,4)
-        mesh_new=TetrahedronMesh()
-        mesh_new.node=node_out
-        mesh_new.element=element_out
+        mesh_new=TetrahedronMesh(node_out, element_out)
         return mesh_new
 #%%
 if __name__ == "__main__":

@@ -63,6 +63,9 @@ class Mesh:
         node=np.zeros((mesh_vtk.GetNumberOfPoints(), 3))
         for n in range(mesh_vtk.GetNumberOfPoints()):
             node[n]=mesh_vtk.GetPoint(n)
+        if len(node) == 0:
+            print('load_from_vtk: cannot load node from', filename)
+            return
         element=[]
         m_list=[]
         for n in range(mesh_vtk.GetNumberOfCells()):
@@ -72,6 +75,9 @@ class Mesh:
             for k in range(cell_n.GetNumberOfPoints()):
                 temp.append(cell_n.GetPointId(k))
             element.append(temp)
+        if len(element) == 0:
+            print('load_from_vtk: cannot load element from', filename)
+            return
         self.node=torch.tensor(node, dtype=dtype)
         self.element=element
         if min(m_list) == max(m_list):

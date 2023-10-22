@@ -5,16 +5,42 @@ Created on Mon Sep 18 20:50:36 2023
 @author: liang
 """
 #%%
+import torch
 import numpy as np
 from PolygonMesh import PolygonMesh
 #%%
+def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
+    #angle from A to B, right hand rule
+    #angle ~[0 ~2pi]
+    #VectorA.shape (B,3)
+    #VectorB.shape (B,3)
+    eps = 1e-8
+    if isinstance(VectorA, np.ndarray) and isinstance(VectorA, np.ndarray):
+        L2Norm_A = np.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
+        L2Norm_B = np.sqrt(VectorB[:,0]*VectorB[:,0]+VectorB[:,1]*VectorB[:,1]+VectorB[:,2]*VectorB[:,2])
+        if np.any(L2Norm_A <= eps) or np.any(L2Norm_B <= eps):
+            print("L2Norm < eps, return 0 @ ComputeAngleBetweenTwoVectorIn3D(...)")
+            return 0
+        CosTheta = (VectorA[:,0]*VectorB[:,0]+VectorA[:,1]*VectorB[:,1]+VectorA[:,2]*VectorB[:,2])/(L2Norm_A*L2Norm_B);
+        CosTheta = np.clip(CosTheta, min=-1, max=1)
+        Theta = np.arccos(CosTheta) #[0, pi], acos(-1) = pi
+    elif isinstance(VectorA, torch.Tensor) and isinstance(VectorA,  torch.Tensor):
+        L2Norm_A = torch.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
+        L2Norm_B = torch.sqrt(VectorB[:,0]*VectorB[:,0]+VectorB[:,1]*VectorB[:,1]+VectorB[:,2]*VectorB[:,2])
+        if torch.any(L2Norm_A <= eps) or torch.any(L2Norm_B <= eps):
+            print("L2Norm < eps, return 0 @ ComputeAngleBetweenTwoVectorIn3D(...)")
+            return 0
+        CosTheta = (VectorA[:,0]*VectorB[:,0]+VectorA[:,1]*VectorB[:,1]+VectorA[:,2]*VectorB[:,2])/(L2Norm_A*L2Norm_B);
+        CosTheta = torch.clamp(CosTheta, min=-1, max=1)
+        Theta = torch.acos(CosTheta) #[0, pi], acos(-1) = pi
+    return Theta
+#%%
 def FindConnectedRegion(mesh, ref_element_idx, adj=2):
-    #mesh is PolygonMesh
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
 
     mesh.build_element_adj_table(adj=adj)
-    element_adj_table=mesh.element_adj_table["adj2"]
+    element_adj_table=mesh.element_adj_table["adj"+str(int(adj))]
     region_element_list=[ref_element_idx]
     active_element_list=[ref_element_idx]
     while True:

@@ -8,23 +8,28 @@ import torch
 import torch_scatter
 from torch_sparse import SparseTensor
 from PolygonMesh import PolygonMesh
-from TriangleMesh import TriangleMesh
+from PolygonMeshProcessing import ComputeAngleBetweenTwoVectorIn3D
 #%%
 class QuadMesh(PolygonMesh):
     #4-node quad element mesh
 
-    def __init__(self, node=None, element=None, dtype=torch.float32):
+    def __init__(self, node=None, element=None, dtype=None):
         super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polygon_quad4'
         self.node_normal=None
         self.element_area=None
         self.element_normal=None
+        self.element_corner_angle=None
 
-    def update_node_normal(self):
-        self.node_normal=QuadMesh.cal_node_normal(self.node, self.element)
+    def update_node_normal(self, angle_weighted=False):
+        self.node_normal=QuadMesh.cal_node_normal(self.node, self.element,
+                                                  angle_weighted=angle_weighted, normalization=True)
+        error=torch.isnan(self.node_normal).sum()
+        if error > 0:
+            print("error: nan in normal_quad @ TriangleMesh:update_node_normal")
 
     @staticmethod
-    def cal_node_normal(node, element, normalization=True):
+    def cal_node_normal(node, element, angle_weighted=False, normalization=True):
         x0=node[element[:,0]]
         x1=node[element[:,1]]
         x2=node[element[:,2]]
@@ -47,6 +52,10 @@ class QuadMesh(PolygonMesh):
                               normal1.view(M,1,3),
                               normal2.view(M,1,3),
                               normal3.view(M,1,3)], dim=1)
+        if angle_weighted == True:
+            e_angle=QuadMesh.cal_element_corner_angle(node, element)#e_angle: (M,3)
+            weight=e_angle/e_angle.sum(dim=1, keepdim=True)
+            normal0123=normal0123*weight.view(M,4,1)
         normal=torch_scatter.scatter(normal0123.view(-1,3), element.view(-1), dim=0, dim_size=N, reduce="sum")
         error=torch.isnan(normal).sum()
         if error > 0:
@@ -60,6 +69,9 @@ class QuadMesh(PolygonMesh):
 
     def update_element_area_and_normal(self):
          self.element_area, self.element_normal=QuadMesh.cal_element_area_and_normal(self.node, self.element)
+
+    def update_element_corner_angle(self):
+        self.element_corner_angle = QuadMesh.cal_element_corner_angle(self.node, self.element)
 
     @staticmethod
     def cal_element_area_and_normal(node, element):
@@ -80,6 +92,22 @@ class QuadMesh(PolygonMesh):
         temp=temp.clamp(min=1e-12)
         normal=cross_uv/temp
         return area, normal
+
+    @staticmethod
+    def cal_element_corner_angle(node, element):
+        x0=node[element[:,0]]
+        x1=node[element[:,1]]
+        x2=node[element[:,2]]
+        x3=node[element[:,3]]
+        # x3--x2
+        # |   |
+        # x0--x1
+        angle0=ComputeAngleBetweenTwoVectorIn3D(x1-x0, x3-x0)
+        angle1=ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1)
+        angle2=ComputeAngleBetweenTwoVectorIn3D(x3-x2, x1-x2)
+        angle3=ComputeAngleBetweenTwoVectorIn3D(x0-x3, x2-x3)
+        angle=torch.cat([angle0.view(-1,1), angle1.view(-1,1), angle2.view(-1,1), angle3.view(-1,1)], dim=1)
+        return angle
 
     @staticmethod
     def cal_element_area(node, element):

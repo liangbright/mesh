@@ -15,7 +15,7 @@ from PolyhedronMesh import PolyhedronMesh
 #%%
 class HexahedronMesh(PolyhedronMesh):
     #8-node C3D8 mesh
-    def __init__(self, node=None, element=None, dtype=torch.float32):
+    def __init__(self, node=None, element=None, dtype=None):
         super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polyhedron_hex8'
 
@@ -126,9 +126,7 @@ class HexahedronMesh(PolyhedronMesh):
         node_idlist, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_out=self.node[node_idlist]
         element_out=element_out.view(-1,8)
-        mesh_new=HexahedronMesh()
-        mesh_new.node=node_out
-        mesh_new.element=element_out
+        mesh_new=HexahedronMesh(node_out, element_out)
         return mesh_new
 #%%
 if __name__ == "__main__":

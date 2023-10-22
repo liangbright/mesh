@@ -19,33 +19,6 @@ class HexahedronMesh(PolyhedronMesh):
         super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polyhedron_hex8'
 
-    def build_adj_node_link(self):
-        adj_node_link=[]
-        for m in range(0, len(self.element)):
-            id0=int(self.element[m][0])
-            id1=int(self.element[m][1])
-            id2=int(self.element[m][2])
-            id3=int(self.element[m][3])
-            id4=int(self.element[m][4])
-            id5=int(self.element[m][5])
-            id6=int(self.element[m][6])
-            id7=int(self.element[m][7])
-            adj_node_link.append([id0, id1]); adj_node_link.append([id1, id0])
-            adj_node_link.append([id1, id2]); adj_node_link.append([id2, id1])
-            adj_node_link.append([id2, id3]); adj_node_link.append([id3, id2])
-            adj_node_link.append([id3, id0]); adj_node_link.append([id0, id3])
-            adj_node_link.append([id4, id5]); adj_node_link.append([id5, id4])
-            adj_node_link.append([id5, id6]); adj_node_link.append([id6, id5])
-            adj_node_link.append([id6, id7]); adj_node_link.append([id7, id6])
-            adj_node_link.append([id7, id4]); adj_node_link.append([id4, id7])
-            adj_node_link.append([id0, id4]); adj_node_link.append([id4, id0])
-            adj_node_link.append([id1, id5]); adj_node_link.append([id5, id1])
-            adj_node_link.append([id2, id6]); adj_node_link.append([id6, id2])
-            adj_node_link.append([id3, id7]); adj_node_link.append([id7, id3])
-        adj_node_link=torch.tensor(adj_node_link, dtype=torch.int64)
-        adj_node_link=torch.unique(adj_node_link, dim=0, sorted=True)
-        self.adj_node_link=adj_node_link
-
     def build_edge(self):
         edge=[]
         for m in range(0, len(self.element)):

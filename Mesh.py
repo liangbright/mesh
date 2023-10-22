@@ -16,11 +16,10 @@ except:
     print("cannot import vtk")
 #%%
 class Mesh:
-    def __init__(self, mesh_type):
-        if ('polyhedron' in mesh_type) or ('polygon' in mesh_type):
-            pass
-        else:
-            raise ValueError('unknown mesh_type:'+mesh_type)
+    def __init__(self, node, element, dtype, element_type, mesh_type):
+        if ('polyhedron' not in mesh_type) and ('polygon' not in mesh_type):
+            raise ValueError('unknown mesh_type: '+mesh_type)
+        #--------------------------------------------------------------------
         self.mesh_type=mesh_type
         self.node=[] #Nx2 or Nx3
         self.element=[] #[e_1,...e_M], e1 is a list of node indexes in e1
@@ -31,7 +30,10 @@ class Mesh:
         self.node_data={} #e.g., {'stress':stress}, stress is Nx9 2D array
         self.element_data={} #e.g., {'stress':stress}, stress is Mx9 2D array
         self.mesh_data={} # it is only saved by torch
-        self.edge=None #only one edge between two adj nodes
+        #--------------------------------------------------------------------
+        #if a new node or a new element is added/deleted after a mesh is created,
+        #then the following info will become invalid
+        self.edge=None #only one undirected edge between two adj nodes
         self.node_adj_link=None
         self.node_adj_table=None
         self.element_adj_link=None  #{"adj1":[...], "adj2":[...], "adj3":[...], ...}
@@ -39,6 +41,50 @@ class Mesh:
         self.node_to_element_adj_table=None
         self.node_to_edge_adj_table=None
         self.edge_to_element_adj_table=None #{"adj1":[...], "adj2":[...]}
+        #--------------------------------------------------------------------
+        if node is not None:
+            if isinstance(node, list):
+                if dtype is not None:
+                    node=torch.tensor(node, dtype=dtype)
+                else:
+                    node=torch.tensor(node, dtype=torch.float32)
+            elif isinstance(node, np.ndarray):
+                if dtype is not None:
+                    node=torch.tensor(node, dtype=dtype)
+                else:
+                    if node.dtype == np.float64:
+                        node=torch.tensor(node, dtype=torch.float64)
+                    else:
+                        node=torch.tensor(node, dtype=torch.float32)
+            elif isinstance(node,  torch.Tensor):
+                if dtype is not None:
+                    node=node.to(dtype)
+            else:
+                raise ValueError("unkown object type of node")
+            self.node=node
+
+        if element is not None:
+            if isinstance(element, list) or isinstance(node, np.ndarray):
+                try:
+                    element=torch.tensor(element, dtype=torch.int64)
+                except:
+                    pass
+            elif isinstance(element,  torch.Tensor):
+                  pass
+            else:
+                raise ValueError("unkown object type of element")
+            self.element=element
+
+        if element_type is not None:
+            if isinstance(element_type, np.ndarray):
+                pass
+            elif isinstance(element_type, list):
+                element_type=np.ndarray(element_type)
+            elif isinstance(element, torch.Tensor):
+                  element_type=element_type.cpu().numpy()
+            else:
+                raise ValueError("unkown object type of element_type")
+            self.element_type=element_type
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
@@ -189,7 +235,7 @@ class Mesh:
             elif 'polygon' in self.mesh_type:
                 save_polygon_mesh_to_vtk(self, filename)
             else:
-                raise ValueError('unknown mesh_type:'+self.mesh_type)
+                raise ValueError('unknown mesh_type: '+self.mesh_type)
             return
         #-----------------------------
         mesh_vtk=self.convert_to_vtk()
@@ -200,23 +246,23 @@ class Mesh:
         elif 'polygon' in self.mesh_type:
             writer=vtk.vtkPolyDataWriter()
         else:
-            raise ValueError('unknown mesh_type:'+self.mesh_type)
+            raise ValueError('unknown mesh_type: '+self.mesh_type)
         if vtk42 == True:
             try:
                 version=[int(x) for x in vtk.__version__ .split('.')]
                 if version[0]>=9 and version[1]>=1:
                     writer.SetFileVersion(42)
                 else:
-                    print('cannot save to 4.2 vtk version')
+                    print('save_as_vtk: cannot save to 4.2 vtk version')
             except:
-                print('cannot save to 4.2 vtk version')
+                print('save_as_vtk: cannot save to 4.2 vtk version')
         if ascii == True:
             writer.SetFileTypeToASCII()
         writer.SetInputData(mesh_vtk)
         writer.SetFileName(filename)
         writer.Write()
 
-    def save_as_torch(self, filename, save_link=False):
+    def save_as_torch(self, filename, save_adj_info=False):
         data={"mesh_type":self.mesh_type,
               "node":self.node,
               "element":self.element,
@@ -226,12 +272,14 @@ class Mesh:
               "element_data":self.element_data,
               "mesh_data":self.mesh_data,
               "node_name_to_index":self.node_name_to_index}
-        if save_link == True:
-            data["edge"]=self.edge,
-            data["node_adj_link"]=self.node_adj_link,
-            data["element_adj_link"]=self.element_adj_link,
-            data["node_to_element_adj_table"]=self.node_to_element_adj_table,
-            data["node_to_edge_adj_table"]=self.node_to_edge_adj_table,
+        if save_adj_info == True:
+            data["edge"]=self.edge
+            data["node_adj_link"]=self.node_adj_link
+            data["node_adj_table"]=self.node_adj_table
+            data["element_adj_link"]=self.element_adj_link
+            data["element_adj_table"]=self.element_adj_table
+            data["node_to_element_adj_table"]=self.node_to_element_adj_table
+            data["node_to_edge_adj_table"]=self.node_to_edge_adj_table
             data["edge_to_element_adj_table"]=self.edge_to_element_adj_table
         torch.save(data,  filename)
 
@@ -259,14 +307,22 @@ class Mesh:
             self.mesh_data=data["mesh_data"]
         if "node_name_to_index" in data.keys():
             self.node_name_to_index=data["node_name_to_index"]
-        if "node_to_element_adj_table" in data.keys():
-            self.node_to_element_adj_table=data["node_to_element_adj_table"]
         if "edge" in data.keys():
             self.edge=data["edge"]
         if "node_adj_link" in data.keys():
             self.node_adj_link=data["node_adj_link"]
+        if "node_adj_table" in data.keys():
+            self.node_adj_table=data["node_adj_table"]
         if "element_adj_link" in data.keys():
             self.element_adj_link=data["element_adj_link"]
+        if "element_adj_table" in data.keys():
+            self.element_adj_table=data["element_adj_table"]
+        if "node_to_element_adj_table" in data.keys():
+            self.node_to_element_adj_table=data["node_to_element_adj_table"]
+        if "node_to_edge_adj_table" in data.keys():
+            self.node_to_edge_adj_table=data["node_to_edge_adj_table"]
+        if "edge_to_element_adj_table" in data.keys():
+            self.edge_to_element_adj_table=data["edge_to_element_adj_table"]
 
     def copy(self, node, element, dtype=None, detach=True):
         if isinstance(node, torch.Tensor):
@@ -323,16 +379,33 @@ class Mesh:
         if object_type == 'list':
             pass
         elif object_type == 'numpy':
-            element=np.array(element)
+            element=np.array(element, dtype=np.int64)
         elif object_type == 'torch':
-            element=torch.tensor(element)
+            element=torch.tensor(element, dtype=torch.int64)
         return element
 
     def build_edge(self):
+        #undirected edge represents a connection between two nodes
+        #self.edge[k] is [node_idx_a, node_idx_b] and node_idx_a < node_idx_b
+        #edge is determined by element_type
+        #it is efficient to implement this function in a derived class (e.g. PolygonMesh)
         raise NotImplementedError
 
     def build_node_adj_link(self):
-        raise NotImplementedError
+        #no self link
+        #this is useful for GNN
+        if self.edge is None:
+            self.build_edge()
+        node_adj_link=[]
+        for k in range(0, len(self.edge)):
+            idx0=int(self.edge[k,0])
+            idx1=int(self.edge[k,1])
+            if idx0 != idx1:
+                node_adj_link.append([idx0, idx1])
+                node_adj_link.append([idx1, idx0])
+        node_adj_link=torch.tensor(node_adj_link, dtype=torch.int64)
+        node_adj_link=torch.unique(node_adj_link, dim=0, sorted=True)
+        self.node_adj_link=node_adj_link
 
     def build_node_adj_table(self):
         #no self link
@@ -504,9 +577,10 @@ class Mesh:
             for n in range(0, len(new_element[m])):
                 old_idx=new_element[m][n]
                 new_element[m][n]=map[old_idx]
-        new_mesh=Mesh(self.mesh_type)
-        new_mesh.node=new_node
-        new_mesh.element=new_element
+        new_element_type=None
+        if self.element_type is not None:
+            new_element_type=self.element_type[element_idx_list]
+        new_mesh=Mesh(new_node, new_element, None, new_element_type, self.mesh_type)
         return new_mesh
 #%%
 if __name__ == "__main__":

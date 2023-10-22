@@ -17,23 +17,6 @@ class TetrahedronMesh(PolyhedronMesh):
         super().__init__(node=node, element=element, dtype=dtype)
         self.mesh_type='polyhedron_tet4'
 
-    def build_node_adj_link(self):
-        node_adj_link=[]
-        for m in range(0, len(self.element)):
-            id0=int(self.element[m][0])
-            id1=int(self.element[m][1])
-            id2=int(self.element[m][2])
-            id3=int(self.element[m][3])
-            node_adj_link.append([id0, id1]); node_adj_link.append([id1, id0])
-            node_adj_link.append([id0, id2]); node_adj_link.append([id2, id0])
-            node_adj_link.append([id0, id3]); node_adj_link.append([id3, id0])
-            node_adj_link.append([id1, id2]); node_adj_link.append([id2, id1])
-            node_adj_link.append([id1, id3]); node_adj_link.append([id3, id1])
-            node_adj_link.append([id2, id3]); node_adj_link.append([id3, id2])
-        node_adj_link=torch.tensor(node_adj_link, dtype=torch.int64)
-        node_adj_link=torch.unique(node_adj_link, dim=0, sorted=True)
-        self.node_adj_link=node_adj_link
-
     def build_edge(self):
         edge=[]
         for m in range(0, len(self.element)):

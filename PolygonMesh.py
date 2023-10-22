@@ -11,54 +11,7 @@ from Mesh import Mesh
 #%%
 class PolygonMesh(Mesh):
     def __init__(self, node=None, element=None, dtype=None):
-        super().__init__('polygon')
-        if node is not None:
-            if isinstance(node, list):
-                if dtype is not None:
-                    node=torch.tensor(node, dtype=dtype)
-                else:
-                    node=torch.tensor(node, dtype=torch.float32)
-            elif isinstance(node, np.ndarray):
-                if dtype is not None:
-                    node=torch.tensor(node, dtype=dtype)
-                else:
-                    if node.dtype == np.float64:
-                        node=torch.tensor(node, dtype=torch.float64)
-                    else:
-                        node=torch.tensor(node, dtype=torch.float32)
-            elif isinstance(node,  torch.Tensor):
-                if dtype is not None:
-                    node=node.to(dtype)
-            else:
-                raise ValueError("unkown object type of node")
-            self.node=node
-
-        if element is not None:
-            if isinstance(element, list) or isinstance(node, np.ndarray):
-                try:
-                    element=torch.tensor(element, dtype=torch.int64)
-                except:
-                    pass
-            elif isinstance(element,  torch.Tensor):
-                  pass
-            else:
-                raise ValueError("unkown object type of element")
-            self.element=element
-
-    def build_node_adj_link(self):
-        node_adj_link=[]
-        for m in range(0, len(self.element)):
-            elm=self.element[m]
-            for k in range(0, len(elm)):
-                if k < len(elm)-1:
-                    a=int(elm[k]); b=int(elm[k+1])
-                else:
-                    a=int(elm[k]); b=int(elm[0])
-                node_adj_link.append([a, b])
-                node_adj_link.append([b, a])
-        node_adj_link=torch.tensor(node_adj_link, dtype=torch.int64)
-        node_adj_link=torch.unique(node_adj_link, dim=0, sorted=True)
-        self.node_adj_link=node_adj_link
+        super().__init__(node=node, element=element, dtype=dtype, element_type=None, mesh_type='polygon')
 
     def build_edge(self):
         edge=[]

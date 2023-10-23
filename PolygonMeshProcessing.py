@@ -6,8 +6,10 @@ Created on Mon Sep 18 20:50:36 2023
 """
 #%%
 import torch
+import torch_scatter
 import numpy as np
 from PolygonMesh import PolygonMesh
+from copy import deepcopy
 #%%
 def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
     #angle from A to B, right hand rule
@@ -154,6 +156,41 @@ def ExtractRegionEnclosedByCurve(mesh, curve, inner_node_idx):
         region_element_list.extend(node_to_element_adj_table[idx])
     region_element_list=np.unique(region_element_list).tolist()
     return region_element_list
+#%%
+def SimpleMeshSmoother(mesh, lamda, inplace, mask=None):
+    #lamda: x_i = x_i + lamda*mean_j(x_j - x_i),  0<=lamda<=1
+    #inplace: True or False
+    #mask[k]: 1 to smooth the node-k; 0 not to smooth the node-k
+    if not isinstance(mesh, PolygonMesh):
+        raise NotImplementedError
+    #---------
+    if mask is None:
+        mask=1
+    if isinstance(mask, list):
+        mask=torch.tensor(mask, dtype=mesh.node.dtype, device=mesh.node.device)
+        mask=mask.view(-1,1)
+    elif isinstance(mask, np.ndarray):
+        mask=torch.tensor(mask, dtype=mesh.node.dtype, device=mesh.node.device)
+        mask=mask.view(-1,1)
+    elif isinstance(mask, torch.Tensor):
+        mask=mask.to(mesh.node.dtype).to(mesh.node.device)
+        mask=mask.view(-1,1)
+    #---------
+    if mesh.node_adj_link is None:
+        mesh.build_node_adj_link()
+    x_j=mesh.node[mesh.node_adj_link[:,0]]
+    x_i=mesh.node[mesh.node_adj_link[:,1]]
+    delta=x_j-x_i
+    delta=torch_scatter.scatter(delta, mesh.node_adj_link[:,1], dim=0, dim_size=mesh.node.shape[0], reduce="mean")
+    delta=lamda*delta*mask
+    if inplace == True:
+        mesh.node+=delta
+        return mesh
+    else:
+        new_node=mesh.node+delta
+        new_element=deepcopy(mesh.element)
+        new_mesh=PolygonMesh(new_node, new_element)
+        return new_mesh
 
 
 

@@ -29,6 +29,28 @@ class PolygonMesh(Mesh):
         edge=torch.tensor(edge, dtype=torch.int64)
         edge=torch.unique(edge, dim=0, sorted=True)
         self.edge=edge
+        self.build_map_node_pair_to_edge()
+
+    def build_element_to_edge_adj_table(self):
+        if self.map_node_pair_to_edge is None:
+            self.build_map_node_pari_to_edge()
+        element=self.element
+        if isinstance(element, torch.Tensor):
+            element=element.detach().cpu().numpy()
+        adj_table=[[] for _ in range(len(self.element))]
+        for m in range(0, len(element)):
+            elm=element[m]
+            for n in range(0, len(elm)):
+                idx_n=int(elm[n])
+                if n < len(elm)-1:
+                    idx_n1=int(elm[n+1])
+                else:
+                    idx_n1=int(elm[0])
+                edge_idx=self.get_edge_id_from_node_pair(idx_n, idx_n1)
+                if edge_idx is None:
+                    raise ValueError('edge_idx is None')
+                adj_table[m].append(edge_idx)
+        self.element_to_edge_adj_table=adj_table
 
     def update_edge_length(self):
         if self.edge is None:
@@ -46,11 +68,9 @@ class PolygonMesh(Mesh):
         #return index list of nodes on boundary
         if self.edge is None:
             self.build_edge()
-        try:
-            edge_to_element_adj_table=self.edge_to_element_adj_table["adj2"]
-        except:
-            self.build_edge_to_element_adj_table(adj=2)
-            edge_to_element_adj_table=self.edge_to_element_adj_table["adj2"]
+        if self.edge_to_element_adj_table is None:
+            self.build_edge_to_element_adj_table()
+        edge_to_element_adj_table=self.edge_to_element_adj_table
         boundary=[]
         for k in range(0, len(self.edge)):
             elm=edge_to_element_adj_table[k]

@@ -51,6 +51,7 @@ class TetrahedronMesh(PolyhedronMesh):
         edge=torch.tensor(edge, dtype=torch.int64)
         edge=torch.unique(edge, dim=0, sorted=True)
         self.edge=edge
+        self.build_map_node_pair_to_edge()
 
     def cal_element_volumn(self):
         #need C3D4 element

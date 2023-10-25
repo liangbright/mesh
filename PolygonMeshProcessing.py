@@ -16,6 +16,11 @@ def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
     #angle ~[0 ~2pi]
     #VectorA.shape (B,3)
     #VectorB.shape (B,3)
+    if len(VectorA.shape) == 1:
+        VectorA=VectorA.view(1,3)
+    if len(VectorB.shape) == 1:
+        VectorB=VectorB.view(1,3)
+
     eps = 1e-8
     if isinstance(VectorA, np.ndarray) and isinstance(VectorA, np.ndarray):
         L2Norm_A = np.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
@@ -41,8 +46,9 @@ def FindConnectedRegion(mesh, ref_element_idx, adj=2):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
 
-    mesh.build_element_adj_table(adj=adj)
-    element_adj_table=mesh.element_adj_table["adj"+str(int(adj))]
+    if mesh.element_to_element_adj_table['edge'] is None:
+        mesh.build_element_to_element_adj_table(adj='edge')
+    element_adj_table=mesh.element_to_element_adj_table['edge']
     region_element_list=[ref_element_idx]
     active_element_list=[ref_element_idx]
     while True:
@@ -66,8 +72,9 @@ def TracePolygonMeshBoundaryCurve(mesh, node_idx):
     if node_idx not in boundary:
         return BoundaryCurve
     #---------
-    mesh.build_node_adj_table()
-    node_adj_table=mesh.node_adj_table
+    if mesh.node_to_node_adj_table is None:
+        mesh.build_node_to_node_adj_table()
+    node_adj_table=mesh.node_to_node_adj_table
     idx_next=node_idx
     while True:
         BoundaryCurve.append(idx_next)
@@ -88,8 +95,9 @@ def IsCurveClosed(mesh, curve):
     #the nodes in curve could be in a random order
     curve=[int(x) for x in curve]
     curve=set(curve)
-    mesh.build_node_adj_table()
-    node_adj_table=mesh.node_adj_table
+    if mesh.node_to_node_adj_table is None:
+        mesh.build_node_to_node_adj_table()
+    node_adj_table=mesh.node_to_node_adj_table
     for idx in curve:
         adj_idx_list=node_adj_table[idx]
         temp=curve.intersection(set(adj_idx_list))
@@ -97,64 +105,63 @@ def IsCurveClosed(mesh, curve):
             return False
     return True
 #%%
-def ExtractRegionEnclosedByCurve(mesh, curve, inner_node_idx):
-    #curve is list/array of node indexes on mesh
-    #curve is closed and has no self-intersection
-    #inner_node_idx is the index of a node inside the region
+def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_id):
+    #node_curve_list[k] is a curve - represented by a list/array of node indexes on mesh
+    #the combined curve (from curve_list[0] to curve_list[-1]) is closed
+    #inner_element_id is the index of an element inside the region
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
-    #---------
+    #-------------------------
+    curve=[]
+    for k in range(0, len(node_curve_list)):
+        curve_k=[int(x) for x in node_curve_list[k]]
+        curve.extend(curve_k)
     if not IsCurveClosed(mesh, curve):
         raise ValueError('curve is not closed')
-
-    curve=[int(x) for x in curve]
-    curve=set(curve)
-
-    #element=mesh.element this will lead to error
-    element=mesh.copy_element('list')
-
-    mesh.build_element_adj_table(adj=1)
-    element_adj_table=mesh.element_adj_table['adj1']
-    mesh.build_node_to_element_adj_table()
-    node_to_element_adj_table=mesh.node_to_element_adj_table
-
-    inner_element_list=[]
-    active_element_list=[]
-    adj_elm_idx_list=node_to_element_adj_table[inner_node_idx]
-    #TODO: check if inner_node_idx is really inside region
-    inner_element_list.extend(adj_elm_idx_list)
-    for adj_elm_idx in adj_elm_idx_list:
-        if curve.isdisjoint(element[adj_elm_idx]):
-            active_element_list.append(adj_elm_idx)
-
+    #-------------------------
+    if mesh.edge_to_element_adj_table is None:
+        mesh.build_edge_to_element_adj_table()
+    edge_to_element_adj_table=mesh.edge_to_element_adj_table
+    #-------------------------
+    edge_curve=[]
+    for k in range(0, len(node_curve_list)):
+        curve_k=[int(x) for x in node_curve_list[k]]
+        for n in range(0, len(curve_k)):
+            idx_n=int(curve_k[n])
+            if n < len(curve_k)-1:
+                idx_n1=int(curve_k[n+1])
+            else:
+                idx_n1=int(curve_k[0])
+            edge_idx=mesh.get_edge_id_from_node_pair(idx_n, idx_n1)
+            edge_curve.append(edge_idx)
+    #-------------------------
+    region_element_list=[inner_element_id]
+    active_element_list=[inner_element_id]
     counter=0
     while True:
         new_active_element_list=[]
-        inner_element_set=set(inner_element_list)
+        region_element_set=set(region_element_list)
+        active_element_set=set(active_element_list)
         for act_elm_idx in active_element_list:
-            adj_elm_idx_list=element_adj_table[act_elm_idx]
-            adj_elm_idx_list=list(set(adj_elm_idx_list)-inner_element_set)
-            for adj_elm_idx in adj_elm_idx_list:
-                if curve.isdisjoint(element[adj_elm_idx]):
-                    new_active_element_list.append(adj_elm_idx)
+            for n in range(0, len(mesh.element[act_elm_idx])):
+                idx_n=int(mesh.element[act_elm_idx][n])
+                if n < len(mesh.element[act_elm_idx])-1:
+                    idx_n1=int(mesh.element[act_elm_idx][n+1])
+                else:
+                    idx_n1=int(mesh.element[act_elm_idx][0])
+                edge_idx=mesh.get_edge_id_from_node_pair(idx_n, idx_n1)
+                if edge_idx not in edge_curve:
+                    adj_elm_idx=edge_to_element_adj_table[edge_idx]
+                    adj_elm_idx=list(set(adj_elm_idx)-set(active_element_set))
+                    new_active_element_list.extend(adj_elm_idx)
         if len(new_active_element_list) == 0:
             break
-        new_active_element_list=np.unique(new_active_element_list).tolist()
-        active_element_list=new_active_element_list
-        inner_element_list.extend(active_element_list)
+        active_element_list=list(set(new_active_element_list)-region_element_set)
+        region_element_list.extend(active_element_list)
         counter+=1
         #if counter ==100:
         #    break
     #--------------
-    inner_node_list=[]
-    for elm_idx in inner_element_list:
-        inner_node_list.extend(element[elm_idx])
-    inner_node_list=np.unique(inner_node_list).tolist()
-    #--------------
-    region_element_list=[]
-    for idx in inner_node_list:
-        region_element_list.extend(node_to_element_adj_table[idx])
-    region_element_list=np.unique(region_element_list).tolist()
     return region_element_list
 #%%
 def SimpleMeshSmoother(mesh, lamda, inplace, mask=None):
@@ -176,12 +183,13 @@ def SimpleMeshSmoother(mesh, lamda, inplace, mask=None):
         mask=mask.to(mesh.node.dtype).to(mesh.node.device)
         mask=mask.view(-1,1)
     #---------
-    if mesh.node_adj_link is None:
-        mesh.build_node_adj_link()
-    x_j=mesh.node[mesh.node_adj_link[:,0]]
-    x_i=mesh.node[mesh.node_adj_link[:,1]]
+    if mesh.node_to_node_adj_link is None:
+        mesh.build_node_to_node_adj_link()
+    node_adj_link=mesh.node_to_node_adj_link
+    x_j=mesh.node[node_adj_link[:,0]]
+    x_i=mesh.node[node_adj_link[:,1]]
     delta=x_j-x_i
-    delta=torch_scatter.scatter(delta, mesh.node_adj_link[:,1], dim=0, dim_size=mesh.node.shape[0], reduce="mean")
+    delta=torch_scatter.scatter(delta, node_adj_link[:,1], dim=0, dim_size=mesh.node.shape[0], reduce="mean")
     delta=lamda*delta*mask
     if inplace == True:
         mesh.node+=delta
@@ -191,6 +199,43 @@ def SimpleMeshSmoother(mesh, lamda, inplace, mask=None):
         new_element=deepcopy(mesh.element)
         new_mesh=PolygonMesh(new_node, new_element)
         return new_mesh
+#%%
+def TraceSmoothPolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_threshold=np.pi/4):
+    #find a smoothed polyline on mesh: start_node_idx -> next_node_idx -> ... -> end_node_idx
+    #no self-interselction
+    if not isinstance(mesh, PolygonMesh):
+        raise NotImplementedError
+    #---------
+    if mesh.node_to_node_adj_table is None:
+        mesh.build_node_to_node_adj_table()
+    node_adj_table=mesh.node_to_node_adj_table
+    Polyline=[start_node_idx, next_node_idx]
+    while True:
+        idx_list_next=node_adj_table[Polyline[-1]]
+        idx_list_next=list(set(idx_list_next)-set(Polyline))
+        if len(idx_list_next) == 0:
+            break
+        if end_node_idx in idx_list_next:
+            Polyline.append(end_node_idx)
+            break
+        angel_list=[]
+        for k in range(0, len(idx_list_next)):
+            idxA=Polyline[-2]
+            idxB=Polyline[-1]
+            idxC=idx_list_next[k]
+            vector0=mesh.node[idxB]-mesh.node[idxA]
+            vector1=mesh.node[idxC]-mesh.node[idxB]
+            angle_k=ComputeAngleBetweenTwoVectorIn3D(vector0, vector1)
+            angle_k=angle_k.view(-1).item()
+            angel_list.append(angle_k)
+        k_min=np.argmin(angel_list)
+        if angel_list[k_min] > angle_threshold:
+            break
+        Polyline.append(idx_list_next[k_min])
+    #done
+    return Polyline
+
+
 
 
 

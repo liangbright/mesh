@@ -21,6 +21,7 @@ class Mesh:
         if ('polyhedron' not in mesh_type) and ('polygon' not in mesh_type) and ('finite_element' not in mesh_type):
             raise ValueError('unknown mesh_type: '+mesh_type)
         #--------------------------------------------------------------------
+        self.name="" # name of the mesh
         self.mesh_type=mesh_type
         self.node=[] #Nx3
         self.element=[] #[e_1,...e_M], e1 is a list of node indexes in e1
@@ -32,25 +33,7 @@ class Mesh:
         self.element_data={} #e.g., {'stress':stress}, stress is Mx9 2D array
         self.mesh_data={} # it is only saved by torch
         #--------------------------------------------------------------------
-        #if a new node or a new element is added/deleted after a mesh is created,
-        #then the following adj info will become invalid
-        self.edge=None #only one undirected edge between two adj nodes
-        self.map_node_pair_to_edge=None#sparse matrix: self.map_node_pair_to_edge[i,j] - 1 is index (>=0) in self.edge
-        self.node_to_node_adj_link=None#similar to edge_index in pytorch geometric
-        self.node_to_node_adj_table=None
-        self.node_to_edge_adj_table=None
-        self.node_to_element_adj_table=None
-        self.edge_to_element_adj_table=None# an edge of an element
-        self.element_to_edge_adj_table=None# an edge of an element
-        if 'polygon' in mesh_type:
-            self.element_to_element_adj_link={"node":None, "edge":None}
-            self.element_to_element_adj_table={"node":None, "edge":None}
-        elif 'polyhedron' in mesh_type:
-            self.face=None
-            self.face_to_element_adj_table=None
-            self.element_to_face_adj_table=None
-            self.element_to_element_adj_link={"node":None, "edge":None, "face":None}
-            self.element_to_element_adj_table={"node":None, "edge":None, "face":None}
+        self.clear_adj_info() #initialize adj info to None
         #--------------------------------------------------------------------
         if node is not None:
             if isinstance(node, list):
@@ -70,21 +53,21 @@ class Mesh:
                 if dtype is not None:
                     node=node.to(dtype)
             else:
-                raise ValueError("unkown object type of node")
+                raise ValueError("unkown python-object type of node")
             self.node=node
-
+        #--------------------------------------------------------------------
         if element is not None:
             if isinstance(element, list) or isinstance(node, np.ndarray):
                 try:
                     element=torch.tensor(element, dtype=torch.int64)
                 except:
                     pass
-            elif isinstance(element,  torch.Tensor):
+            elif isinstance(element, torch.Tensor):
                   pass
             else:
-                raise ValueError("unkown object type of element")
+                raise ValueError("unkown python-object type of element")
             self.element=element
-
+        #--------------------------------------------------------------------
         if element_type is not None:
             if isinstance(element_type, np.ndarray):
                 pass
@@ -93,8 +76,30 @@ class Mesh:
             elif isinstance(element, torch.Tensor):
                   element_type=element_type.cpu().numpy()
             else:
-                raise ValueError("unkown object type of element_type")
+                raise ValueError("unkown python-object type of element_type")
             self.element_type=element_type
+        #--------------------------------------------------------------------
+
+    def clear_adj_info(self):
+        #if a new node or a new element is added/deleted after a mesh is created,
+        #then the adj info will become invalid and therefore need to be cleared
+        self.edge=None #only one undirected edge between two adj nodes
+        self.map_node_pair_to_edge=None#sparse matrix: self.map_node_pair_to_edge[i,j] - 1 is index (>=0) in self.edge
+        self.node_to_node_adj_link=None#similar to edge_index in pytorch geometric
+        self.node_to_node_adj_table=None
+        self.node_to_edge_adj_table=None
+        self.node_to_element_adj_table=None
+        self.edge_to_element_adj_table=None# an edge of an element
+        self.element_to_edge_adj_table=None# an edge of an element
+        if 'polygon' in self.mesh_type:
+            self.element_to_element_adj_link={"node":None, "edge":None}
+            self.element_to_element_adj_table={"node":None, "edge":None}
+        elif 'polyhedron' in self.mesh_type:
+            self.face=None
+            self.face_to_element_adj_table=None
+            self.element_to_face_adj_table=None
+            self.element_to_element_adj_link={"node":None, "edge":None, "face":None}
+            self.element_to_element_adj_table={"node":None, "edge":None, "face":None}
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
@@ -509,7 +514,7 @@ class Mesh:
                 adj_table[edge_idx].append(m)
         self.edge_to_element_adj_table=adj_table
 
-    def build_element_adj_link_node(self):
+    def build_element_to_element_adj_link_node(self):
         if self.node_to_element_adj_table is None:
             self.build_node_to_element_adj_table()
         adj_link=[]
@@ -524,7 +529,7 @@ class Mesh:
         adj_link=torch.unique(adj_link, dim=0, sorted=True)
         self.element_to_element_adj_link["node"]=adj_link
 
-    def build_element_adj_link_edge(self):
+    def build_element_to_element_adj_link_edge(self):
         if self.edge_to_element_adj_table is None:
             self.build_edge_to_element_adj_table()
         adj_link=[]
@@ -537,7 +542,7 @@ class Mesh:
                     adj_link.append([eid2, eid1])
         adj_link=torch.tensor(adj_link, dtype=torch.int64)
         adj_link=torch.unique(adj_link, dim=0, sorted=True)
-        self.element_adj_link["edge"]=adj_link
+        self.element_to_element_adj_link["edge"]=adj_link
 
     def build_element_to_element_adj_link(self, adj):
         #no self link
@@ -549,25 +554,6 @@ class Mesh:
             return self.build_element_to_element_adj_link_edge()
         else:
             raise NotImplementedError
-        '''
-        #---------adj = nodeN, N>=2-------------------
-        adj_link=[]
-        element=self.element
-        if isinstance(element, torch.Tensor):
-            element=element.detach().cpu().numpy()
-        for n in range(0, len(element)):
-            e_n=element[n]
-            for m in range(n+1, len(element)):
-                e_m=element[m]
-                temp=np.isin(e_n, e_m, assume_unique=True)
-                temp=np.sum(temp)
-                if temp >= adj:
-                    element_adj_link.append([n, m])
-                    element_adj_link.append([m, n])
-        adj_link=torch.tensor(adj_link, dtype=torch.int64)
-        adj_link=torch.unique(adj_link, dim=0, sorted=True)
-        self.element_to_element_adj_link[adj]=adj_link
-        '''
 
     def build_element_to_element_adj_table(self, adj):
         #no self link

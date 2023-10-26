@@ -8,10 +8,35 @@ import torch
 import numpy as np
 from copy import deepcopy
 from Mesh import Mesh
+import json
 #%%
 class PolygonMesh(Mesh):
     def __init__(self, node=None, element=None, dtype=None):
         super().__init__(node=node, element=element, dtype=dtype, element_type=None, mesh_type='polygon')
+
+    def save_as_mdk_json(self, filename):
+        #to be compatible with MDK SavePolygonMeshFromJsonDataFile
+        #use json to store node_set, element_set, etc
+        #use vtk to store node, element, node_data, element_data, etc
+        data={}
+        data["Name"]=self.name
+        data["ObjectType"]="PolygonMesh"
+        data["ScalarType"]="double"
+        data["IndexType"]="int_max"
+        data["PointCount"]=self.node.shape[0]
+        data["FaceCount"]=len(self.element)
+        data["PointSetCount"]=len(self.node_set)
+        data["FaceSetCount"]=len(self.element_set)
+        data["PointSetList"]=[]
+        for i, (k, v) in enumerate(self.node_set.items()):
+            data["PointSetList"].append({k:v})
+        data["FaceSetList"]=[]
+        for i, (k, v) in enumerate(self.element_set.items()):
+            data["FaceSetList"].append({k:v})
+        data["PointAndFace"]=filename.split("/")[-1]+".vtk"
+        with open(filename, "w") as outfile:
+            json.dump(data, outfile, indent=4)
+        self.save_as_vtk(filename+".vtk", ascii=True, vtk42=True, use_vtk=False)
 
     def build_edge(self):
         edge=[]
@@ -132,12 +157,14 @@ class PolygonMesh(Mesh):
             return False
 
     def quad_to_tri(self):
+        #inplace function to divide every quad element to two triangle elements
         if isinstance(self.element, torch.Tensor):
             if len(self.element[0]) == 3:
                 #this is TriangleMesh
                 return
         element_new=[]
         m_list=[]
+        flag=False
         for m in range(0, len(self.element)):
             elm=self.copy_to_list(self.element[m])
             if len(elm) == 4:
@@ -155,6 +182,7 @@ class PolygonMesh(Mesh):
                 element_new.append([id0, id2, id3])
                 element_new.append([id0, id1, id2])
                 m_list.append(3)
+                flag=True
             elif len(elm) == 3:
                 id0=int(elm[0])
                 id1=int(elm[1])
@@ -164,12 +192,14 @@ class PolygonMesh(Mesh):
             else:
                 element_new.append(elm)
                 m_list.append(len(elm))
-        if min(m_list) == max(m_list):
-            if isinstance(self.element, torch.Tensor):
-                element_new=torch.tensor(element_new, dtype=torch.int64, device=self.element.device)
-            else:
-                element_new=torch.tensor(element_new, dtype=torch.int64)
-        self.element=element_new
+        if flag == True: # at lest one quad is divided
+            if min(m_list) == max(m_list):
+                if isinstance(self.element, torch.Tensor):
+                    element_new=torch.tensor(element_new, dtype=torch.int64, device=self.element.device)
+                else:
+                    element_new=torch.tensor(element_new, dtype=torch.int64)
+            self.element=element_new
+            self.clear_adj_info()
 
     def get_sub_mesh(self, element_idx_list):
         new_mesh=super().get_sub_mesh(element_idx_list)

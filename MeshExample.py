@@ -28,9 +28,9 @@ def create_quad_cylinder_mesh(n_rings, n_points_per_ring, dtype=torch.float32, d
     cylinder.element=torch.tensor(element, dtype=torch.int64, device=device)
     return cylinder
 #%%
-def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32, device=torch.device("cpu")):
+def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):
     element=torch.zeros(((Nx-1)*(Ny-1), 4), dtype=torch.int64)
-    grid=torch.zeros((Nx*Ny, 3), dtype=dtype)
+    node=torch.zeros((Nx*Ny, 3), dtype=dtype)
     map=torch.zeros((Ny, Nx), dtype=torch.int64)
     id=-1
     boundary=[]
@@ -38,11 +38,11 @@ def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32, device=torch.device("cpu"
         for x in range(0, Nx):
             id+=1
             map[y,x]=id
-            grid[id,0]=x
-            grid[id,1]=y
+            node[id,0]=x
+            node[id,1]=y
             if y==0 or y==Ny-1 or x==0 or x==Nx-1:
                 boundary.append(id)
-    boundary=torch.tensor(boundary, dtype=torch.int64)
+    #-----------------------------------
     id=-1
     for y in range(0, Ny-1):
         for x in range(0, Nx-1):
@@ -51,10 +51,8 @@ def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32, device=torch.device("cpu"
             element[id,1]=map[y,x+1]
             element[id,2]=map[y+1,x+1]
             element[id,3]=map[y+1,x]
-    grid_mesh=QuadMesh()
-    grid_mesh.node=grid.to(device)
-    grid_mesh.element=element.to(device)
-    grid_mesh.node_set['boundary']=boundary.to(device)
+    grid_mesh=QuadMesh(node, element)
+    grid_mesh.node_set['boundary']=boundary
     return grid_mesh
 #%%
 def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32, device=torch.device("cpu")):

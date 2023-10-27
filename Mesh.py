@@ -380,12 +380,9 @@ class Mesh:
         elif isinstance(element, np.ndarray):
             self.element=torch.tensor(element.copy(), dtype=torch.int64)
         elif isinstance(element, tuple) or isinstance(element, list):
-            m_list=[]
-            for m in range(0, len(element)):
-                m_list.append(len(element[m]))
-            if max(m_list) == min(m_list):
+            try:
                 self.element=torch.tensor(element, dtype=torch.int64)
-            else:
+            except:
                 self.element=deepcopy(element)
         else:
             raise NotImplementedError

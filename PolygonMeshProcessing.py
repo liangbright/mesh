@@ -200,7 +200,7 @@ def SimpleMeshSmoother(mesh, lamda, inplace, mask=None):
         new_mesh=PolygonMesh(new_node, new_element)
         return new_mesh
 #%%
-def TraceSmoothPolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_threshold=np.pi/4):
+def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_threshold=np.pi/4):
     #find a smoothed polyline on mesh: start_node_idx -> next_node_idx -> ... -> end_node_idx
     #no self-interselction
     if not isinstance(mesh, PolygonMesh):
@@ -234,8 +234,55 @@ def TraceSmoothPolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, 
         Polyline.append(idx_list_next[k_min])
     #done
     return Polyline
+#%%
+def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
+    #Merge meshA and meshB
+    #The shared points are in node_idx_listA of meshA and node_idx_listB of meshB
+    #if the distance between two nodes is <= distance_threshold, then merge the two nodes
+    if (not isinstance(meshA, PolygonMesh)) or (not isinstance(meshA, PolygonMesh)):
+        raise NotImplementedError
+    if meshA.node.shape[0] == 0:
+        meshAB=PolygonMesh()
+        meshAB.copy(meshA.node, meshA.element)
+    if meshB.node.shape[0] == 0:
+        meshAB=PolygonMesh()
+        meshAB.copy(meshB.node, meshB.element)
 
+    #node_idx_map_A_to_Out=np.arange(0, meshA.node.shape[0])
+    node_idx_map_B_to_Out=-1*np.ones(meshB.node.shape[0])
 
+    curveA = meshA.node[node_idx_listA]
+    counterA = np.zeros(len(curveA))
+    for n in range(0, len(node_idx_listB)):
+        node_n=meshB.node[node_idx_listB[n]].view(1,-1)
+        dist=((curveA-node_n)**2).sum(dim=1).sqrt()
+        idx=dist.argmin()
+        if dist[idx] <= distance_threshold:
+            node_idx_map_B_to_Out[node_idx_listB[n]]=node_idx_listA[idx]
+            counterA[idx]+=1
+    if counterA.max() > 1:
+        raise ValueError("two nodes of meshB are mapped to the same node of meshA")
 
+    node_idx=meshA.node.shape[0]-1
+    node_idx_listB_keep=[]
+    for n in range(0, meshB.node.shape[0]):
+        if node_idx_map_B_to_Out[n] < 0:
+            node_idx+=1
+            node_idx_map_B_to_Out[n]=node_idx
+            node_idx_listB_keep.append(n)
 
+    nodeAB=torch.cat([meshA.node, meshB.node[node_idx_listB_keep]], dim=0)
+    elementAB=meshA.copy_element('list') + meshB.copy_element('list')
+    for m in range(len(meshA.element), len(elementAB)):
+        elm=elementAB[m]
+        for k in range(0, len(elm)):
+            elm[k]=node_idx_map_B_to_Out[elm[k]]
+
+    meshAB=PolygonMesh(nodeAB, elementAB)
+    return meshAB
+#%%
+def MergeMeshOnBoundary(meshA, meshB, distance_threshold):
+    if (not isinstance(meshA, PolygonMesh)) or (not isinstance(meshA, PolygonMesh)):
+        raise NotImplementedError
+    return MergeMesh(meshA, meshA.find_boundary_node(), meshB, meshB.find_boundary_node(), distance_threshold)
 

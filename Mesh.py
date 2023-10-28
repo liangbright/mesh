@@ -165,8 +165,8 @@ class Mesh:
             self.element_data[name]=torch.tensor(data, dtype=dtype)
 
     @staticmethod
-    def get_vtk_cell_type(element_type, n_nodes):
-        if 'polyhedron' in element_type:
+    def get_vtk_cell_type(mesh_type, n_nodes):
+        if 'polyhedron' in mesh_type:
             if n_nodes == 4:
                 cell_type=vtk.VTK_TETRA
             elif n_nodes == 6:
@@ -177,7 +177,7 @@ class Mesh:
                 cell_type=vtk.VTK_QUADRATIC_TETRA
             else:
                 cell_type=vtk.VTK_POLYHEDRON
-        elif 'polygon' in element_type:
+        elif 'polygon' in mesh_type:
             if n_nodes == 3:
                 cell_type=vtk.VTK_TRIANGLE
             elif n_nodes == 4:
@@ -187,8 +187,13 @@ class Mesh:
             else:
                 cell_type=vtk.VTK_POLYGON
         else:
-            raise ValueError('unknown element_type:'+element_type)
+            raise ValueError('unknown mesh_type:'+mesh_type)
         return cell_type
+
+    @staticmethod
+    def translate_element_type_to_vtk_cell_type(element_type):
+        #element_type: tri3, quad4, hex8, etc
+        raise NotImplementedError
 
     def convert_to_vtk(self):
         if _Flag_VTK_IMPORT_ == False:
@@ -212,7 +217,7 @@ class Mesh:
             if self.element_type is None:
                 cell_type=Mesh.get_vtk_cell_type(self.mesh_type, len(e))
             else:
-                cell_type=Mesh.get_vtk_cell_type(self.element_type[n], len(e))
+                cell_type=Mesh.translate_element_type_to_vtk_cell_type(self.element_type[n])
             mesh_vtk.InsertNextCell(cell_type, len(e), e)
         #--------- convert node_data to PointData --------#
         for name, data in self.node_data.items():
@@ -390,12 +395,10 @@ class Mesh:
     def copy_to_list(self, x):
         if isinstance(x, list):
             y=deepcopy(x)
-        elif isinstance(x, torch.Tensor):
-            y=x.cpu().numpy().tolist()
-        elif isinstance(x, np.ndarray):
+        elif isinstance(x, np.ndarray) or isinstance(x, torch.Tensor):
             y=x.tolist()
-        elif isinstance(x, tuple):
-            y=list(x)
+        elif isinstance(x, tuple) or isinstance(x, set):
+            y=deepcopy(list(x))
         else:
             raise ValueError('unsupported type')
         return y
@@ -435,19 +438,20 @@ class Mesh:
         self.map_node_pair_to_edge=SparseTensor(row=row, col=col, value=value,
                                                 sparse_sizes=(self.node.shape[0], self.node.shape[0]))
 
-    def get_edge_id_from_node_pair(self, node_id0, node_id1):
+    def get_edge_idx_from_node_pair(self, nodeA_idx, nodeB_idx):
+        # nodeA---an edge---nodeB
         if self.map_node_pair_to_edge is None:
             self.build_map_node_pair_to_edge()
-        if node_id0 == node_id1:
+        if nodeA_idx == nodeB_idx:
             return None
-        elif node_id0 < node_id1:
-            edge_id = self.map_node_pair_to_edge[node_id0, node_id1].to_dense().item()
+        elif nodeA_idx < nodeB_idx:
+            edge_idx = self.map_node_pair_to_edge[nodeA_idx, nodeB_idx].to_dense().item()
         else:
-            edge_id = self.map_node_pair_to_edge[node_id1, node_id0].to_dense().item()
-        if edge_id == 0:
+            edge_idx = self.map_node_pair_to_edge[nodeB_idx, nodeA_idx].to_dense().item()
+        if edge_idx == 0:
             return None
-        edge_id=edge_id-1
-        return edge_id
+        edge_idx=edge_idx-1
+        return edge_idx
 
     def build_node_to_node_adj_link(self):
         #no self link

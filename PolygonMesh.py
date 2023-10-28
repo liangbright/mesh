@@ -71,7 +71,7 @@ class PolygonMesh(Mesh):
                     idx_n1=int(elm[n+1])
                 else:
                     idx_n1=int(elm[0])
-                edge_idx=self.get_edge_id_from_node_pair(idx_n, idx_n1)
+                edge_idx=self.get_edge_idx_from_node_pair(idx_n, idx_n1)
                 if edge_idx is None:
                     raise ValueError('edge_idx is None')
                 adj_table[m].append(edge_idx)

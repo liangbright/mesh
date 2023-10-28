@@ -9,6 +9,9 @@ import torch
 import torch_scatter
 import numpy as np
 from PolygonMesh import PolygonMesh
+from TriangleMesh import TriangleMesh
+from QuadMesh import QuadMesh
+from QuadTriangleMesh import QuadTriangleMesh
 from copy import deepcopy
 #%%
 def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
@@ -132,7 +135,7 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_id):
                 idx_n1=int(curve_k[n+1])
             else:
                 idx_n1=int(curve_k[0])
-            edge_idx=mesh.get_edge_id_from_node_pair(idx_n, idx_n1)
+            edge_idx=mesh.get_edge_idx_from_node_pair(idx_n, idx_n1)
             edge_curve.append(edge_idx)
     #-------------------------
     region_element_list=[inner_element_id]
@@ -149,7 +152,7 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_id):
                     idx_n1=int(mesh.element[act_elm_idx][n+1])
                 else:
                     idx_n1=int(mesh.element[act_elm_idx][0])
-                edge_idx=mesh.get_edge_id_from_node_pair(idx_n, idx_n1)
+                edge_idx=mesh.get_edge_idx_from_node_pair(idx_n, idx_n1)
                 if edge_idx not in edge_curve:
                     adj_elm_idx=edge_to_element_adj_table[edge_idx]
                     adj_elm_idx=list(set(adj_elm_idx)-set(active_element_set))
@@ -164,41 +167,61 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_id):
     #--------------
     return region_element_list
 #%%
-def SimpleMeshSmoother(mesh, lamda, inplace, mask=None):
-    #lamda: x_i = x_i + lamda*mean_j(x_j - x_i),  0<=lamda<=1
-    #inplace: True or False
-    #mask[k]: 1 to smooth the node-k; 0 not to smooth the node-k
-    if not isinstance(mesh, PolygonMesh):
-        raise NotImplementedError
-    #---------
+def SimpleSmoother(field, adj_link, lamda, mask, inplace):
+    #field.shape (N, ?)
     if mask is None:
         mask=1
     if isinstance(mask, list):
-        mask=torch.tensor(mask, dtype=mesh.node.dtype, device=mesh.node.device)
+        mask=torch.tensor(mask, dtype=field.dtype, device=field.device)
         mask=mask.view(-1,1)
     elif isinstance(mask, np.ndarray):
-        mask=torch.tensor(mask, dtype=mesh.node.dtype, device=mesh.node.device)
+        mask=torch.tensor(mask, dtype=field.dtype, device=field.device)
         mask=mask.view(-1,1)
     elif isinstance(mask, torch.Tensor):
-        mask=mask.to(mesh.node.dtype).to(mesh.node.device)
+        mask=mask.to(field.dtype).to(field.device)
         mask=mask.view(-1,1)
+    else:
+        raise ValueError('python-object type of mask is not supported')
+    #---------
+    x_j=field[adj_link[:,0]]
+    x_i=field[adj_link[:,1]]
+    delta=x_j-x_i
+    delta=torch_scatter.scatter(delta, adj_link[:,1], dim=0, dim_size=field.shape[0], reduce="mean")
+    delta=lamda*delta*mask
+    if inplace == True:
+        field+=delta
+    else:
+        field=field+delta
+    return field
+#%%
+def SimpleMeshSmoother(mesh, lamda, mask, n_iters):
+    #lamda: x_i = x_i + lamda*mean_j(x_j - x_i),  0<=lamda<=1
+    #inplace: True or False
+    #if mask is not None: mask[k]: 1 to smooth the node-k; 0 not to smooth the node-k
+    if not isinstance(mesh, PolygonMesh):
+        raise NotImplementedError
     #---------
     if mesh.node_to_node_adj_link is None:
         mesh.build_node_to_node_adj_link()
-    node_adj_link=mesh.node_to_node_adj_link
-    x_j=mesh.node[node_adj_link[:,0]]
-    x_i=mesh.node[node_adj_link[:,1]]
-    delta=x_j-x_i
-    delta=torch_scatter.scatter(delta, node_adj_link[:,1], dim=0, dim_size=mesh.node.shape[0], reduce="mean")
-    delta=lamda*delta*mask
-    if inplace == True:
-        mesh.node+=delta
-        return mesh
-    else:
-        new_node=mesh.node+delta
-        new_element=deepcopy(mesh.element)
-        new_mesh=PolygonMesh(new_node, new_element)
-        return new_mesh
+    adj_link=mesh.node_to_node_adj_link
+    for n in range(0, n_iters):
+        SimpleSmoother(mesh.node, adj_link, lamda, mask, inplace=True)
+#%%
+def SmoothNodeNormal(mesh, lamda, mask, n_iters, angle_weighted=False):
+    if not isinstance(mesh, TriangleMesh):
+        raise NotImplementedError
+    mesh.update_node_normal(angle_weighted=angle_weighted)
+    if mesh.node_to_node_adj_link is None:
+        mesh.build_node_to_node_adj_link()
+    adj_link=mesh.node_to_node_adj_link
+    node_normal=mesh.node_normal
+    for n in range(0, n_iters):
+        SimpleSmoother(node_normal, adj_link, lamda, mask, inplace=True)
+        normal_norm=torch.norm(node_normal, p=2, dim=1, keepdim=True)
+        normal_norm=normal_norm.clamp(min=1e-12)
+        node_normal=node_normal/normal_norm
+    node_normal=node_normal.contiguous()
+    mesh.node_normal=node_normal
 #%%
 def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_threshold=np.pi/4):
     #find a smoothed polyline on mesh: start_node_idx -> next_node_idx -> ... -> end_node_idx
@@ -236,7 +259,7 @@ def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_
     return Polyline
 #%%
 def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
-    #Merge meshA and meshB
+    #Merge meshA (larger) and meshB (smaller)
     #The shared points are in node_idx_listA of meshA and node_idx_listB of meshB
     #if the distance between two nodes is <= distance_threshold, then merge the two nodes
     if (not isinstance(meshA, PolygonMesh)) or (not isinstance(meshA, PolygonMesh)):
@@ -281,8 +304,14 @@ def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
     meshAB=PolygonMesh(nodeAB, elementAB)
     return meshAB
 #%%
-def MergeMeshOnBoundary(meshA, meshB, distance_threshold):
-    if (not isinstance(meshA, PolygonMesh)) or (not isinstance(meshA, PolygonMesh)):
-        raise NotImplementedError
-    return MergeMesh(meshA, meshA.find_boundary_node(), meshB, meshB.find_boundary_node(), distance_threshold)
-
+def MergeMeshOnBoundary(mesh_list, distance_threshold):
+    for mesh in mesh_list:
+        if not isinstance(mesh, PolygonMesh):
+            raise NotImplementedError
+    merged_mesh=mesh_list[0]
+    for n in range(1, len(mesh_list)):
+        mesh_n=mesh_list[n]
+        merged_mesh= MergeMesh(merged_mesh, merged_mesh.find_boundary_node(),
+                               mesh_n, mesh_n.find_boundary_node(),
+                               distance_threshold)
+    return merged_mesh

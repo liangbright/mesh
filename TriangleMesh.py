@@ -10,7 +10,7 @@ from torch_sparse import SparseTensor
 import numpy as np
 from PolygonMesh import PolygonMesh
 from QuadMesh import QuadMesh
-from PolygonMeshProcessing import ComputeAngleBetweenTwoVectorIn3D
+import PolygonMeshProcessing as pmp
 #%%
 class TriangleMesh(PolygonMesh):
     #3-node triangle element mesh
@@ -81,9 +81,9 @@ class TriangleMesh(PolygonMesh):
         #   x2
         #  /  \
         # x0--x1
-        angle0=ComputeAngleBetweenTwoVectorIn3D(x1-x0, x2-x0)
-        angle1=ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1)
-        angle2=ComputeAngleBetweenTwoVectorIn3D(x0-x2, x1-x2)
+        angle0=pmp.ComputeAngleBetweenTwoVectorIn3D(x1-x0, x2-x0)
+        angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1)
+        angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x2, x1-x2)
         angle=torch.cat([angle0.view(-1,1), angle1.view(-1,1), angle2.view(-1,1)], dim=1)
         return angle
 

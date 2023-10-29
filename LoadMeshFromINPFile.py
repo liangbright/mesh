@@ -7,12 +7,6 @@ Created on Fri Mar 17 22:29:00 2023
 import numpy as np
 
 def read_abaqus_inp(filename, remove_unused_node):
-    node=[]
-    node_id=[]
-    element=[]
-    element_id=[]
-    element_type=[]
-    element_set={}
     with open(filename, 'r') as file:
         inp=file.readlines()
         print('total number of lines in inp:', len(inp))
@@ -50,9 +44,8 @@ def read_node(inp):
     while True:
         k=k+1
         if k >= len(inp):
-                break
+            break
         if "*" in inp[k]:
-            lineindex=k
             break
         temp=inp[k].replace(" ", "")
         temp=temp.split(",")

@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from QuadMesh import QuadMesh
+from PolygonMeshProcessing import QuadMesh
 from HexahedronMesh import HexahedronMesh as HexMesh
 #%%
 def create_quad_cylinder_mesh(n_rings, n_points_per_ring, dtype=torch.float32, device=torch.device("cpu")):

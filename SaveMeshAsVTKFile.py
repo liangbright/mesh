@@ -40,7 +40,7 @@ def save_polygon_mesh_to_vtk(mesh, filename):
     #------------------------------------------------------------------
     if len(mesh.node_data.keys()) > 0:
         out.append('POINT_DATA '+str(node.shape[0])+'\n')
-        out.append('FIELD FieldData '+str(len(mesh.node_data.keys())))
+        out.append('FIELD FieldData '+str(len(mesh.node_data.keys()))+'\n')
     for name, data in mesh.node_data.items():
         out.append(name+' '+str(data.shape[1])+' '+str(data.shape[0])+' double'+'\n')
         if isinstance(data, torch.Tensor):
@@ -53,7 +53,7 @@ def save_polygon_mesh_to_vtk(mesh, filename):
     #------------------------------------------------------------------
     if len(mesh.element_data.keys()) > 0:
         out.append('CELL_DATA '+str(len(element))+'\n')
-        out.append('FIELD FieldData '+str(len(mesh.element_data.keys())))
+        out.append('FIELD FieldData '+str(len(mesh.element_data.keys()))+'\n')
     for name, data in mesh.element_data.items():
         out.append(name+' '+str(data.shape[1])+' '+str(data.shape[0])+' double'+'\n')
         if isinstance(data, torch.Tensor):
@@ -120,7 +120,7 @@ def save_polyhedron_mesh_to_vtk(mesh, filename):
     #------------------------------------------------------------------
     if len(mesh.node_data.keys()) > 0:
         out.append('POINT_DATA '+str(node.shape[0])+'\n')
-        out.append('FIELD FieldData '+str(len(mesh.node_data.keys())))
+        out.append('FIELD FieldData '+str(len(mesh.node_data.keys()))+'\n')
     for name, data in mesh.node_data.items():
         out.append(name+' '+str(data.shape[1])+' '+str(data.shape[0])+' double'+'\n')
         if isinstance(data, torch.Tensor):
@@ -133,7 +133,7 @@ def save_polyhedron_mesh_to_vtk(mesh, filename):
     #------------------------------------------------------------------
     if len(mesh.element_data.keys()) > 0:
         out.append('CELL_DATA '+str(len(element))+'\n')
-        out.append('FIELD FieldData '+str(len(mesh.element_data.keys())))
+        out.append('FIELD FieldData '+str(len(mesh.element_data.keys()))+'\n')
     for name, data in mesh.element_data.items():
         out.append(name+' '+str(data.shape[1])+' '+str(data.shape[0])+' double'+'\n')
         if isinstance(data, torch.Tensor):
@@ -146,3 +146,14 @@ def save_polyhedron_mesh_to_vtk(mesh, filename):
     #------------------------------------------------------------------
     with open(filename, 'w', encoding = 'utf-8') as file:
         file.writelines(out)
+#%%
+if __name__ == '__main__':
+    from MeshExample import create_quad_grid_mesh, QuadMesh
+    mesh=create_quad_grid_mesh(10, 10)
+    mesh.node_data={'node_data0':torch.rand((len(mesh.node), 1)),
+                    'node_data1':torch.rand((len(mesh.node), 2))}
+    mesh.element_data={'element_data0':torch.rand((len(mesh.element), 1)),
+                       'element_data1':torch.rand((len(mesh.element), 2))}
+    mesh.save_as_vtk("test_poly_not_use_vtk.vtk", use_vtk=False)
+    mesh1=QuadMesh()
+    mesh1.load_from_vtk("test_poly_not_use_vtk.vtk", dtype="float32")

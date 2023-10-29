@@ -103,7 +103,7 @@ class Mesh:
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
-            print("cannot load from vtk")
+            print("load_from_vtk: vtk is not imported")
             return
         if isinstance(dtype, str):
             if dtype == 'float32':
@@ -197,7 +197,7 @@ class Mesh:
 
     def convert_to_vtk(self):
         if _Flag_VTK_IMPORT_ == False:
-            print("cannot convert to vtk")
+            print("convert_to_vtk: vtk is not imported")
             return
         Points_vtk = vtk.vtkPoints()
         Points_vtk.SetDataTypeToDouble()
@@ -268,13 +268,13 @@ class Mesh:
         else:
             raise ValueError('unknown mesh_type: '+self.mesh_type)
         if vtk42 == True:
-            try:
-                version=[int(x) for x in vtk.__version__ .split('.')]
-                if version[0]>=9 and version[1]>=1:
-                    writer.SetFileVersion(42)
-                else:
-                    print('save_as_vtk: cannot save to 4.2 vtk version')
-            except:
+            version=vtk.vtkVersion.GetVTKVersion()
+            version=[int(a) for a in version.split('.')]
+            if version[0]<=8:
+                pass
+            elif version[0]>=9 and version[1]>=1:
+                writer.SetFileVersion(42)
+            else:
                 print('save_as_vtk: cannot save to 4.2 vtk version')
         if ascii == True:
             writer.SetFileTypeToASCII()

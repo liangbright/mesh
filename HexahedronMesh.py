@@ -10,7 +10,10 @@ from torch_sparse import SparseTensor
 import numpy as np
 import json
 from torch.linalg import det
-from Element_C3D8 import cal_dh_dr, get_integration_point_1i, get_integration_point_8i, interpolate
+try:
+    from Element_C3D8 import cal_dh_dr, get_integration_point_1i, get_integration_point_8i, interpolate
+except:
+    print('can not import Element_C3D8 @ HexahedronMesh')
 from PolyhedronMesh import PolyhedronMesh
 #%%
 class HexahedronMesh(PolyhedronMesh):

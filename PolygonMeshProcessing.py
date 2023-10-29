@@ -14,7 +14,7 @@ from QuadMesh import QuadMesh
 from QuadTriangleMesh import QuadTriangleMesh
 from copy import deepcopy
 #%%
-def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
+def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB, eps = 1e-8):
     #angle from A to B, right hand rule
     #angle ~[0 ~2pi]
     #VectorA.shape (B,3)
@@ -24,13 +24,13 @@ def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
     if len(VectorB.shape) == 1:
         VectorB=VectorB.view(1,3)
 
-    eps = 1e-8
     if isinstance(VectorA, np.ndarray) and isinstance(VectorA, np.ndarray):
         L2Norm_A = np.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
         L2Norm_B = np.sqrt(VectorB[:,0]*VectorB[:,0]+VectorB[:,1]*VectorB[:,1]+VectorB[:,2]*VectorB[:,2])
         if np.any(L2Norm_A <= eps) or np.any(L2Norm_B <= eps):
-            print("L2Norm < eps, return 0 @ ComputeAngleBetweenTwoVectorIn3D(...)")
-            return 0
+            print("L2Norm <= eps, np.clip to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
+            L2Norm_A=np.clip(L2Norm_A, min=eps)
+            L2Norm_B=np.clip(L2Norm_B, min=eps)
         CosTheta = (VectorA[:,0]*VectorB[:,0]+VectorA[:,1]*VectorB[:,1]+VectorA[:,2]*VectorB[:,2])/(L2Norm_A*L2Norm_B);
         CosTheta = np.clip(CosTheta, min=-1, max=1)
         Theta = np.arccos(CosTheta) #[0, pi], acos(-1) = pi
@@ -38,20 +38,20 @@ def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
         L2Norm_A = torch.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
         L2Norm_B = torch.sqrt(VectorB[:,0]*VectorB[:,0]+VectorB[:,1]*VectorB[:,1]+VectorB[:,2]*VectorB[:,2])
         if torch.any(L2Norm_A <= eps) or torch.any(L2Norm_B <= eps):
-            print("L2Norm < eps, return 0 @ ComputeAngleBetweenTwoVectorIn3D(...)")
-            return 0
+            print("L2Norm <= eps, torch.clamp to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
+            L2Norm_A=torch.clamp(L2Norm_A, min=eps)
+            L2Norm_B=torch.clamp(L2Norm_B, min=eps)
         CosTheta = (VectorA[:,0]*VectorB[:,0]+VectorA[:,1]*VectorB[:,1]+VectorA[:,2]*VectorB[:,2])/(L2Norm_A*L2Norm_B);
         CosTheta = torch.clamp(CosTheta, min=-1, max=1)
         Theta = torch.acos(CosTheta) #[0, pi], acos(-1) = pi
     return Theta
 #%%
-def FindConnectedRegion(mesh, ref_element_idx, adj=2):
+def FindConnectedRegion(mesh, ref_element_idx, adj='edge'):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
-
-    if mesh.element_to_element_adj_table['edge'] is None:
-        mesh.build_element_to_element_adj_table(adj='edge')
-    element_adj_table=mesh.element_to_element_adj_table['edge']
+    if mesh.element_to_element_adj_table[adj] is None:
+        mesh.build_element_to_element_adj_table(adj=adj)
+    element_adj_table=mesh.element_to_element_adj_table[adj]
     region_element_list=[ref_element_idx]
     active_element_list=[ref_element_idx]
     while True:

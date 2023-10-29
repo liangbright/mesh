@@ -53,7 +53,7 @@ class Mesh:
                 if dtype is not None:
                     node=node.to(dtype)
             else:
-                raise ValueError("unkown python-object type of node")
+                raise ValueError("unsupported python-object type of node")
             self.node=node
         #--------------------------------------------------------------------
         if element is not None:
@@ -65,7 +65,7 @@ class Mesh:
             elif isinstance(element, torch.Tensor):
                   pass
             else:
-                raise ValueError("unkown python-object type of element")
+                raise ValueError("unsupported python-object type of element")
             self.element=element
         #--------------------------------------------------------------------
         if element_type is not None:
@@ -76,7 +76,7 @@ class Mesh:
             elif isinstance(element, torch.Tensor):
                   element_type=element_type.cpu().numpy()
             else:
-                raise ValueError("unkown python-object type of element_type")
+                raise ValueError("unsupported python-object type of element_type")
             self.element_type=element_type
         #--------------------------------------------------------------------
 
@@ -103,21 +103,20 @@ class Mesh:
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
-            print("load_from_vtk: vtk is not imported")
-            return
+            raise ValueError("vtk is not imported")
         if isinstance(dtype, str):
             if dtype == 'float32':
                 dtype=torch.float32
             elif dtype == 'float64':
                 dtype=torch.float64
             else:
-                ValueError('unknown dtype:'+str(dtype))
+                ValueError('unsupported dtype:'+str(dtype))
         if 'polyhedron' in self.mesh_type:
             reader = vtk.vtkUnstructuredGridReader()
         elif 'polygon' in self.mesh_type:
             reader = vtk.vtkPolyDataReader()
         else:
-            raise ValueError('unknown mesh_type:'+self.mesh_type)
+            raise ValueError('unsupported mesh_type:'+self.mesh_type)
         reader.SetFileName(filename)
         reader.Update()
         mesh_vtk = reader.GetOutput()
@@ -125,8 +124,7 @@ class Mesh:
         for n in range(mesh_vtk.GetNumberOfPoints()):
             node[n]=mesh_vtk.GetPoint(n)
         if len(node) == 0:
-            print('load_from_vtk: cannot load node from', filename)
-            return
+            raise ValueError('cannot load node from', filename)
         element=[]
         m_list=[]
         for n in range(mesh_vtk.GetNumberOfCells()):
@@ -137,8 +135,7 @@ class Mesh:
                 temp.append(cell_n.GetPointId(k))
             element.append(temp)
         if len(element) == 0:
-            print('load_from_vtk: cannot load element from', filename)
-            return
+            raise ValueError('cannot load element from', filename)
         self.node=torch.tensor(node, dtype=dtype)
         self.element=element
         if min(m_list) == max(m_list):
@@ -187,7 +184,7 @@ class Mesh:
             else:
                 cell_type=vtk.VTK_POLYGON
         else:
-            raise ValueError('unknown mesh_type:'+mesh_type)
+            raise ValueError('unsupported mesh_type:'+mesh_type)
         return cell_type
 
     @staticmethod
@@ -197,8 +194,7 @@ class Mesh:
 
     def convert_to_vtk(self):
         if _Flag_VTK_IMPORT_ == False:
-            print("convert_to_vtk: vtk is not imported")
-            return
+            raise ValueError("vtk is not imported")
         Points_vtk = vtk.vtkPoints()
         Points_vtk.SetDataTypeToDouble()
         Points_vtk.SetNumberOfPoints(len(self.node))
@@ -209,7 +205,7 @@ class Mesh:
         elif 'polygon' in self.mesh_type:
             mesh_vtk = vtk.vtkPolyData()
         else:
-            raise ValueError('unknown mesh_type:'+self.mesh_type)
+            raise ValueError('unsupported mesh_type:'+self.mesh_type)
         mesh_vtk.SetPoints(Points_vtk)
         mesh_vtk.Allocate(len(self.element))
         for n in range(0, len(self.element)):
@@ -248,14 +244,18 @@ class Mesh:
             mesh_vtk.GetCellData().AddArray(vtk_array)
         return mesh_vtk
 
-    def save_as_vtk(self, filename, ascii=True, vtk42=True, use_vtk=False):
+    def save_as_vtk(self, filename, vtk42=True, use_vtk=False):
         if _Flag_VTK_IMPORT_ == False or use_vtk == False:
             if 'polyhedron' in self.mesh_type:
                 save_polyhedron_mesh_to_vtk(self, filename)
+                if vtk42 == False:
+                    print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=True")
             elif 'polygon' in self.mesh_type:
                 save_polygon_mesh_to_vtk(self, filename)
+                if vtk42 == False:
+                    print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=True")
             else:
-                raise ValueError('unknown mesh_type: '+self.mesh_type)
+                raise ValueError('unsupported mesh_type: '+self.mesh_type)
             return
         #-----------------------------
         mesh_vtk=self.convert_to_vtk()
@@ -266,7 +266,7 @@ class Mesh:
         elif 'polygon' in self.mesh_type:
             writer=vtk.vtkPolyDataWriter()
         else:
-            raise ValueError('unknown mesh_type: '+self.mesh_type)
+            raise ValueError('unsupported mesh_type: '+self.mesh_type)
         if vtk42 == True:
             version=vtk.vtkVersion.GetVTKVersion()
             version=[int(a) for a in version.split('.')]
@@ -275,9 +275,8 @@ class Mesh:
             elif version[0]>=9 and version[1]>=1:
                 writer.SetFileVersion(42)
             else:
-                print('save_as_vtk: cannot save to 4.2 vtk version')
-        if ascii == True:
-            writer.SetFileTypeToASCII()
+                print('Mesh save_as_vtk: cannot save to 4.2 version vtk')
+        writer.SetFileTypeToASCII()
         writer.SetInputData(mesh_vtk)
         writer.SetFileName(filename)
         writer.Write()
@@ -400,7 +399,7 @@ class Mesh:
         elif isinstance(x, tuple) or isinstance(x, set):
             y=deepcopy(list(x))
         else:
-            raise ValueError('unsupported type')
+            raise ValueError('unsupported python-object type')
         return y
 
     def copy_element(self, object_type):

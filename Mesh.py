@@ -18,7 +18,7 @@ except:
 #%%
 class Mesh:
     def __init__(self, node, element, dtype, element_type, mesh_type):
-        if ('polyhedron' not in mesh_type) and ('polygon' not in mesh_type) and ('finite_element' not in mesh_type):
+        if ('polyhedron' not in mesh_type) and ('polygon' not in mesh_type):
             raise ValueError('unknown mesh_type: '+mesh_type)
         #--------------------------------------------------------------------
         self.name="" # name of the mesh
@@ -544,6 +544,21 @@ class Mesh:
         adj_link=torch.unique(adj_link, dim=0, sorted=True)
         self.element_to_element_adj_link["edge"]=adj_link
 
+    def build_element_to_element_adj_link_face(self):
+        if self.face_to_element_adj_table is None:
+            self.build_face_to_element_adj_table()
+        adj_link=[]
+        for n in range(0, len(self.face_to_element_adj_table)):
+            e_set=self.face_to_element_adj_table["face"][n]
+            for m1 in range(0, len(e_set)):
+                for m2 in range(m1+1, len(e_set)):
+                    eid1=e_set[m1]; eid2=e_set[m2]
+                    adj_link.append([eid1, eid2])
+                    adj_link.append([eid2, eid1])
+        adj_link=torch.tensor(adj_link, dtype=torch.int64)
+        adj_link=torch.unique(adj_link, dim=0, sorted=True)
+        self.element_to_element_adj_link["face"]=adj_link
+
     def build_element_to_element_adj_link(self, adj):
         #no self link
         if adj not in ['node', 'edge', 'face']:
@@ -552,6 +567,8 @@ class Mesh:
             return self.build_element_to_element_adj_link_node()
         elif adj == 'edge':
             return self.build_element_to_element_adj_link_edge()
+        elif adj == 'face':
+            return self.build_element_to_element_adj_link_face()
         else:
             raise NotImplementedError
 
@@ -574,21 +591,21 @@ class Mesh:
         #implement this function in a derived class (e.g., PolygonMesh)
         raise NotImplementedError
 
-    def get_sub_mesh(self, element_idx_list):
+    def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
         #this function is slow: ony use it if the mesh has different types of elements
         new_element=[]
-        used_old_idx_list=[]
+        node_idx_list=[]
         for m in range(0, len(element_idx_list)):
             elm=self.element[element_idx_list[m]]
             elm=self.copy_to_list(elm)
             new_element.append(elm)
-            used_old_idx_list.extend(elm)
-        used_old_idx_list=np.unique(used_old_idx_list)
-        new_node=self.node[used_old_idx_list]
+            node_idx_list.extend(elm)
+        node_idx_list=np.unique(node_idx_list)
+        new_node=self.node[node_idx_list]
         #map old node idx to new node idx
         map={}
-        for n in range(0, len(used_old_idx_list)):
-            old_idx=used_old_idx_list[n]
+        for n in range(0, len(node_idx_list)):
+            old_idx=node_idx_list[n]
             map[old_idx]=n #n is new_idx
         for m in range(0, len(new_element)):
             for n in range(0, len(new_element[m])):
@@ -598,7 +615,10 @@ class Mesh:
         if self.element_type is not None:
             new_element_type=self.element_type[element_idx_list]
         new_mesh=Mesh(new_node, new_element, None, new_element_type, self.mesh_type)
-        return new_mesh
+        if return_node_idx_list == False:
+            return new_mesh
+        else:
+            return new_mesh, node_idx_list
 #%%
 if __name__ == "__main__":
     #%%

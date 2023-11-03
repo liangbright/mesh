@@ -24,15 +24,18 @@ class HexahedronMesh(PolyhedronMesh):
 
     def build_edge(self):
         edge=[]
-        for m in range(0, len(self.element)):
-            id0=self.element[m][0]
-            id1=self.element[m][1]
-            id2=self.element[m][2]
-            id3=self.element[m][3]
-            id4=self.element[m][4]
-            id5=self.element[m][5]
-            id6=self.element[m][6]
-            id7=self.element[m][7]
+        element=self.element
+        if isinstance(element, torch.Tensor):
+            element=element.detach().cpu().numpy()
+        for m in range(0, len(element)):
+            id0=int(element[m][0])
+            id1=int(element[m][1])
+            id2=int(element[m][2])
+            id3=int(element[m][3])
+            id4=int(element[m][4])
+            id5=int(element[m][5])
+            id6=int(element[m][6])
+            id7=int(element[m][7])
             if id0 < id1:
                 edge.append([id0, id1])
             else:
@@ -85,6 +88,93 @@ class HexahedronMesh(PolyhedronMesh):
         edge=torch.unique(edge, dim=0, sorted=True)
         self.edge=edge
         self.build_map_node_pair_to_edge()
+
+    def build_element_to_edge_adj_table(self):
+        if self.map_node_pair_to_edge is None:
+            self.build_map_node_pari_to_edge()
+        element=self.element
+        if isinstance(element, torch.Tensor):
+            element=element.detach().cpu().numpy()
+        adj_table=[[] for _ in range(len(self.element))]
+        for m in range(0, len(element)):
+            id0=int(element[m][0])
+            id1=int(element[m][1])
+            id2=int(element[m][2])
+            id3=int(element[m][3])
+            id4=int(element[m][4])
+            id5=int(element[m][5])
+            id6=int(element[m][6])
+            id7=int(element[m][7])
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id0, id1))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id1, id2))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id2, id3))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id0, id3))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id4, id5))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id5, id6))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id6, id7))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id4, id7))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id0, id4))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id1, id5))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id2, id6))
+            adj_table[m].append(self.get_edge_idx_from_node_pair(id3, id7))
+        self.element_to_edge_adj_table=adj_table
+
+    def build_face(self):
+        #self.face[k] is a quad: [node_idx0, node_idx1, node_idx2, node_idx3]
+        self.build_element_to_face_adj_table()
+
+    def build_element_to_face_adj_table(self):
+        face=[]
+        element=self.element
+        if isinstance(element, torch.Tensor):
+            element=element.detach().cpu().numpy()
+        for m in range(0, len(self.element)):
+            id0=int(element[m][0])
+            id1=int(element[m][1])
+            id2=int(element[m][2])
+            id3=int(element[m][3])
+            id4=int(element[m][4])
+            id5=int(element[m][5])
+            id6=int(element[m][6])
+            id7=int(element[m][7])
+            face.append(np.sort([id0, id3, id2, id1]).tolist())
+            face.append(np.sort([id4, id5, id6, id7]).tolist())
+            face.append(np.sort([id0, id1, id5, id4]).tolist())
+            face.append(np.sort([id1, id2, id6, id5]).tolist())
+            face.append(np.sort([id2, id3, id7, id6]).tolist())
+            face.append(np.sort([id3, id0, id4, id7]).tolist())
+        face=torch.tensor(face, type=torch.int64)
+        face_unique, idx_list=torch.unique(face, return_inverse=True, dim=0)
+        self.face=face_unique
+        self.element_to_face_adj_table=idx_list.reshape(-1,6)
+
+    def build_face_to_element_adj_table(self):
+        if self.element_to_face_adj_table is None:
+            self.build_element_to_face_adj_table()
+        adj_table=[[] for _ in range(len(self.face))]
+        for m in range(0, len(self.element)):
+            face_idx_list=self.element_to_face_adj_table[m]
+            for idx in face_idx_list:
+                adj_table[idx].append(m)
+        self.face_to_element_adj_table=adj_table
+
+    def find_surface_face(self):
+        if self.face_to_element_adj_table is None:
+            self.build_face_to_element_adj_table()
+        face_idx_list=[]
+        for k in range(0, len(self.face)):
+            adj_elm_idx=self.face_to_element_adj_table[k]
+            if len(adj_elm_idx) <= 1:
+                face_idx_list.append(k)
+        return face_idx_list
+
+    def find_surface_node(self):
+        face_idx_list=self.find_surface_face()
+        node_idx_list=[]
+        for idx in face_idx_list:
+            node_idx_list.extend(self.face[idx])
+        node_idx_list=np.unique(node_idx_list).tolist()
+        return node_idx_list
 
     def cal_element_volumn(self):
         X=self.node[self.element]#shape (M,8,3)

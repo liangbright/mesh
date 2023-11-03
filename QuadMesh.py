@@ -21,7 +21,7 @@ class QuadMesh(PolygonMesh):
         self.element_normal=None
         self.element_corner_angle=None
 
-    def update_node_normal(self, angle_weighted=False):
+    def update_node_normal(self, angle_weighted=True):
         self.node_normal=QuadMesh.cal_node_normal(self.node, self.element,
                                                   angle_weighted=angle_weighted, normalization=True)
         error=torch.isnan(self.node_normal).sum()
@@ -29,7 +29,7 @@ class QuadMesh(PolygonMesh):
             print("error: nan in normal_quad @ TriangleMesh:update_node_normal")
 
     @staticmethod
-    def cal_node_normal(node, element, angle_weighted=False, normalization=True):
+    def cal_node_normal(node, element, angle_weighted=True, normalization=True):
         x0=node[element[:,0]]
         x1=node[element[:,1]]
         x2=node[element[:,2]]
@@ -199,15 +199,18 @@ class QuadMesh(PolygonMesh):
         mesh_new.element=element_new
         return mesh_new
 
-    def get_sub_mesh(self, element_id_list):
+    def get_sub_mesh(self, element_id_list, return_node_idx_list=False):
         element_sub=self.element[element_id_list]
-        node_idlist, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
-        node_new=self.node[node_idlist]
+        node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
+        node_new=self.node[node_idx_list]
         element_new=element_out.view(-1,4)
         mesh_new=QuadMesh()
         mesh_new.node=node_new
         mesh_new.element=element_new
-        return mesh_new
+        if return_node_idx_list == False:
+            return mesh_new
+        else:
+            return mesh_new, node_idx_list
 #%%
 if __name__ == "__main__":
     filename="F:/MLFEA/TAA/data/343c1.5/bav17_AortaModel_P0_best.vtk"

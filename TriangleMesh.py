@@ -22,7 +22,7 @@ class TriangleMesh(PolygonMesh):
         self.element_normal=None
         self.element_corner_angle=None
 
-    def update_node_normal(self, angle_weighted=False):
+    def update_node_normal(self, angle_weighted=True):
         self.element_area, self.element_normal=TriangleMesh.cal_element_area_and_normal(self.node, self.element)
         self.node_normal=TriangleMesh.cal_node_normal(self.node, self.element, self.element_normal,
                                                       angle_weighted=angle_weighted, normalization=True)
@@ -31,7 +31,7 @@ class TriangleMesh(PolygonMesh):
             print("error: nan in normal_quad @ TriangleMesh:update_node_normal")
 
     @staticmethod
-    def cal_node_normal(node, element, element_normal=None, angle_weighted=False, normalization=True):
+    def cal_node_normal(node, element, element_normal=None, angle_weighted=True, normalization=True):
         if element_normal is None:
             element_area, element_normal=TriangleMesh.cal_element_area_and_normal(node, element)
         M=element.shape[0]
@@ -210,13 +210,16 @@ class TriangleMesh(PolygonMesh):
         mesh_new=QuadMesh(node_new, element_new)
         return mesh_new
 
-    def get_sub_mesh(self, element_idx_list):
+    def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
         element_sub=self.element[element_idx_list]
-        node_idlist, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
-        node_new=self.node[node_idlist]
+        node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
+        node_new=self.node[node_idx_list]
         element_new=element_out.view(-1,3)
         mesh_new=TriangleMesh(node_new, element_new)
-        return mesh_new
+        if return_node_idx_list == False:
+            return mesh_new
+        else:
+            return mesh_new, node_idx_list
 #%%
 if __name__ == "__main__":
     #%%

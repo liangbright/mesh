@@ -98,8 +98,8 @@ class PolygonMesh(Mesh):
         edge_to_element_adj_table=self.edge_to_element_adj_table
         boundary=[]
         for k in range(0, len(self.edge)):
-            elm=edge_to_element_adj_table[k]
-            if len(elm) <= 1:
+            adj_elm_idx=edge_to_element_adj_table[k]
+            if len(adj_elm_idx) <= 1:
                 boundary.append(int(self.edge[k,0]))
                 boundary.append(int(self.edge[k,1]))
         boundary=np.unique(boundary).tolist()
@@ -201,10 +201,13 @@ class PolygonMesh(Mesh):
             self.element=element_new
             self.clear_adj_info()
 
-    def get_sub_mesh(self, element_idx_list):
-        new_mesh=super().get_sub_mesh(element_idx_list)
+    def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
+        new_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
         new_mesh=PolygonMesh(new_mesh.node, new_mesh.element)
-        return new_mesh
+        if return_node_idx_list == False:
+            return new_mesh
+        else:
+            return new_mesh, node_idx_list
 #%%
 if __name__ == "__main__":
     filename="D:/MLFEA/TAA/data/bav17_AortaModel_P0_best.pt"

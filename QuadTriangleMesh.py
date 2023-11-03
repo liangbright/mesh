@@ -321,10 +321,13 @@ class QuadTriangleMesh(PolygonMesh):
         mesh_new=QuadTriangleMesh(node_new, element_new)
         return mesh_new
 
-    def get_sub_mesh(self, element_idx_list):
-        new_mesh=super().get_sub_mesh(element_idx_list)
+    def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
+        new_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
         new_mesh=QuadTriangleMesh(new_mesh.node, new_mesh.element)
-        return new_mesh
+        if return_node_idx_list == False:
+            return new_mesh
+        else:
+            return new_mesh, node_idx_list
 #%%
 if __name__ == "__main__":
     filename="F:/MLFEA/TAA/data/343c1.5/bav17_AortaModel_P0_best.vtk"

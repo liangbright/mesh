@@ -452,6 +452,18 @@ class Mesh:
         edge_idx=edge_idx-1
         return edge_idx
 
+    def update_edge_length(self):
+        if self.edge is None:
+            self.build_edge()
+        self.edge_length=Mesh.cal_edge_length(self.node, self.edge)
+
+    @staticmethod
+    def cal_edge_length(node, edge):
+        x_j=node[edge[:,0]]
+        x_i=node[edge[:,1]]
+        edge_length=torch.norm(x_i-x_j, p=2, dim=1, keepdim=True)
+        return edge_length
+
     def build_node_to_node_adj_link(self):
         #no self link
         #this is useful for GNN

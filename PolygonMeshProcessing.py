@@ -131,3 +131,27 @@ def MergeMeshOnBoundary(mesh_list, distance_threshold):
                                mesh_n, mesh_n.find_boundary_node(),
                                distance_threshold)
     return merged_mesh
+#%%
+def SimpleSmootherForQuadMesh(mesh, lamda, mask, n_iters):
+    if mesh.node_to_element_adj_table is None:
+        mesh.build_node_to_element_adj_table()
+
+    try:
+        adj_link=mesh.mesh_data['quad_node_to_node_adj_link']
+    except:
+        adj_link=[]
+        for n in range(0, len(mesh.node)):
+            adj_elm_idx=mesh.node_to_element_adj_table[n]
+            adj_elm=mesh.element[adj_elm_idx]
+            adj_node_idx=torch.unique(adj_elm.reshape(-1)).tolist()
+            for idx in adj_node_idx:
+                if idx != n:
+                    adj_link.append([idx, n])
+                    adj_link.append([n, idx])
+        adj_link=torch.tensor(adj_link, dtype=torch.int64)
+        adj_link=torch.unique(adj_link, dim=0, sorted=True)
+        mesh.mesh_data['quad_node_to_node_adj_link']=adj_link
+
+    for n in range(0, n_iters):
+        SimpleSmoother(mesh.node, adj_link, lamda, mask, inplace=True)
+

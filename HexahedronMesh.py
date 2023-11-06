@@ -125,6 +125,7 @@ class HexahedronMesh(PolyhedronMesh):
 
     def build_element_to_face_adj_table(self):
         face=[]
+        face_sorted=[]
         element=self.element
         if isinstance(element, torch.Tensor):
             element=element.detach().cpu().numpy()
@@ -137,16 +138,17 @@ class HexahedronMesh(PolyhedronMesh):
             id5=int(element[m][5])
             id6=int(element[m][6])
             id7=int(element[m][7])
-            face.append(np.sort([id0, id3, id2, id1]).tolist())
-            face.append(np.sort([id4, id5, id6, id7]).tolist())
-            face.append(np.sort([id0, id1, id5, id4]).tolist())
-            face.append(np.sort([id1, id2, id6, id5]).tolist())
-            face.append(np.sort([id2, id3, id7, id6]).tolist())
-            face.append(np.sort([id3, id0, id4, id7]).tolist())
-        face=torch.tensor(face, type=torch.int64)
-        face_unique, idx_list=torch.unique(face, return_inverse=True, dim=0)
-        self.face=face_unique
-        self.element_to_face_adj_table=idx_list.reshape(-1,6)
+            face.append([id0, id3, id2, id1])
+            face.append([id4, id5, id6, id7])
+            face.append([id0, id1, id5, id4])
+            face.append([id1, id2, id6, id5])
+            face.append([id2, id3, id7, id6])
+            face.append([id3, id0, id4, id7])
+        face=np.array(face, dtype=np.int64)
+        face_sorted,_=np.sort(face, axis=1)
+        face_sorted_unique, index, inverse=np.unique(face_sorted, return_index=True, return_inverse=True, axis=0)
+        self.face=torch.tensor(face[index], dtype=torch.int64)
+        self.element_to_face_adj_table=torch.tensor(inverse.reshape(-1,6), dtype=torch.int64)
 
     def build_face_to_element_adj_table(self):
         if self.element_to_face_adj_table is None:

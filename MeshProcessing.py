@@ -7,7 +7,7 @@ Created on Fri Nov  3 00:12:58 2023
 import torch
 import torch_scatter
 import numpy as np
-import Mesh
+from Mesh import Mesh
 from copy import deepcopy
 #%%
 def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB, eps = 1e-8):
@@ -45,6 +45,8 @@ def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB, eps = 1e-8):
 def FindConnectedRegion(mesh, ref_element_idx, adj):
     if not isinstance(mesh, Mesh):
         raise NotImplementedError
+    if adj not in ["node", "edge", "face"]:
+        raise ValueError()
     if mesh.element_to_element_adj_table[adj] is None:
         mesh.build_element_to_element_adj_table(adj=adj)
     element_adj_table=mesh.element_to_element_adj_table[adj]
@@ -116,7 +118,7 @@ def IsCurveClosed(mesh, curve):
             return False
     return True
 #%%
-def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_threshold=np.pi/4):
+def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_threshold=np.pi/2):
     #find a smoothed polyline on mesh: start_node_idx -> next_node_idx -> ... -> end_node_idx
     #no self-interselction
     if not isinstance(mesh, Mesh):
@@ -147,7 +149,10 @@ def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_
         k_min=np.argmin(angel_list)
         if angel_list[k_min] > angle_threshold:
             break
-        Polyline.append(idx_list_next[k_min])
+        else:
+            Polyline.append(idx_list_next[k_min])
+    if (end_node_idx is not None) and (Polyline[-1] != end_node_idx):
+        print("warning: Polyline[-1] != end_node_idx @ TracePolyline")
     #done
     return Polyline
 #%%

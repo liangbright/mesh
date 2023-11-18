@@ -101,6 +101,27 @@ class Mesh:
             self.element_to_element_adj_link={"node":None, "edge":None, "face":None}
             self.element_to_element_adj_table={"node":None, "edge":None, "face":None}
 
+    def load_from_stl(self, filename, dtype):
+        if _Flag_VTK_IMPORT_ == False:
+            raise ValueError("vtk is not imported")
+        if isinstance(dtype, str):
+            if dtype == 'float32':
+                dtype=torch.float32
+            elif dtype == 'float64':
+                dtype=torch.float64
+            else:
+                raise ValueError('unsupported dtype:'+str(dtype))
+        if 'polyhedron' in self.mesh_type:
+            raise ValueError('unsupported')
+        elif 'polygon' in self.mesh_type:
+            reader = vtk.vtkSTLReader()
+        else:
+            raise ValueError('unsupported mesh_type:'+self.mesh_type)
+        reader.SetFileName(filename)
+        reader.Update()
+        mesh_vtk = reader.GetOutput()
+        self.convert_mesh_vtk(mesh_vtk, dtype, filename)
+
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError("vtk is not imported")
@@ -110,7 +131,7 @@ class Mesh:
             elif dtype == 'float64':
                 dtype=torch.float64
             else:
-                ValueError('unsupported dtype:'+str(dtype))
+                raise ValueError('unsupported dtype:'+str(dtype))
         if 'polyhedron' in self.mesh_type:
             reader = vtk.vtkUnstructuredGridReader()
         elif 'polygon' in self.mesh_type:
@@ -120,11 +141,14 @@ class Mesh:
         reader.SetFileName(filename)
         reader.Update()
         mesh_vtk = reader.GetOutput()
+        self.convert_mesh_vtk(mesh_vtk, dtype, filename)
+
+    def convert_mesh_vtk(self, mesh_vtk, dtype, filename):
         node=np.zeros((mesh_vtk.GetNumberOfPoints(), 3))
         for n in range(mesh_vtk.GetNumberOfPoints()):
             node[n]=mesh_vtk.GetPoint(n)
         if len(node) == 0:
-            raise ValueError('cannot load node from', filename)
+            raise ValueError('cannot load node from '+filename)
         element=[]
         m_list=[]
         for n in range(mesh_vtk.GetNumberOfCells()):
@@ -135,7 +159,7 @@ class Mesh:
                 temp.append(cell_n.GetPointId(k))
             element.append(temp)
         if len(element) == 0:
-            raise ValueError('cannot load element from', filename)
+            raise ValueError('cannot load element from '+filename)
         self.node=torch.tensor(node, dtype=dtype)
         self.element=element
         if min(m_list) == max(m_list):
@@ -249,11 +273,11 @@ class Mesh:
             if 'polyhedron' in self.mesh_type:
                 save_polyhedron_mesh_to_vtk(self, filename)
                 if vtk42 == False:
-                    print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=True")
+                    print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False")
             elif 'polygon' in self.mesh_type:
                 save_polygon_mesh_to_vtk(self, filename)
                 if vtk42 == False:
-                    print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=True")
+                    print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False")
             else:
                 raise ValueError('unsupported mesh_type: '+self.mesh_type)
             return
@@ -412,17 +436,28 @@ class Mesh:
             element=torch.tensor(element, dtype=torch.int64)
         return element
 
+    def copy_node(self, object_type, dtype="float32"):
+        node=self.copy_to_list(self.node)
+        if object_type == 'list':
+            pass
+        elif object_type == 'numpy':
+            node=np.array(node, dtype=dtype)
+        elif object_type == 'torch':
+            node=torch.tensor(node, dtype=dtype)
+        return node
+
     def build_edge(self):
         #undirected edge represents a connection between two nodes
         #self.edge[k] is [node_idx_a, node_idx_b] and node_idx_a < node_idx_b: self.edge[k,0] < self.edge[k,1]
         #edge is determined by element_type
         #it is efficient to implement this function in a derived class (e.g. PolygonMesh)
-        #  call self.build_map_node_pair_to_edge() inside build_edge(self)
         raise NotImplementedError
 
     def build_map_node_pair_to_edge(self):
         if self.edge is None:
             self.build_edge()
+        if self.map_node_pair_to_edge is not None:
+            return
         row=[]
         col=[]
         value=[]
@@ -437,7 +472,7 @@ class Mesh:
         self.map_node_pair_to_edge=SparseTensor(row=row, col=col, value=value,
                                                 sparse_sizes=(self.node.shape[0], self.node.shape[0]))
 
-    def get_edge_idx_from_node_pair(self, nodeA_idx, nodeB_idx):
+    def get_edge_idx_from_node_pair_slow(self, nodeA_idx, nodeB_idx):
         # nodeA---an edge---nodeB
         if self.map_node_pair_to_edge is None:
             self.build_map_node_pair_to_edge()
@@ -450,6 +485,23 @@ class Mesh:
         if edge_idx == 0:
             return None
         edge_idx=edge_idx-1
+        return edge_idx
+
+    def get_edge_idx_from_node_pair(self, nodeA_idx, nodeB_idx):
+        # nodeA---an edge---nodeB
+        if self.node_to_edge_adj_table is None:
+            self.build_node_to_edge_adj_table()
+        if nodeA_idx == nodeB_idx:
+            return None
+        edge_idx_listA=self.node_to_edge_adj_table[nodeA_idx]
+        edge_idx_listB=self.node_to_edge_adj_table[nodeB_idx]
+        temp=np.intersect1d(edge_idx_listA, edge_idx_listB, assume_unique=True)
+        if len(temp) == 0:
+            edge_idx=None
+        elif len(temp) == 1:
+            edge_idx=int(temp.item())
+        else:
+            raise ValueError("more than one edge between node "+str(nodeA_idx)+" and node"+str(nodeB_idx))
         return edge_idx
 
     def update_edge_length(self):
@@ -546,7 +598,7 @@ class Mesh:
             self.build_edge_to_element_adj_table()
         adj_link=[]
         for n in range(0, len(self.edge_to_element_adj_table)):
-            e_set=self.edge_to_element_adj_table["edge"][n]
+            e_set=self.edge_to_element_adj_table[n]
             for m1 in range(0, len(e_set)):
                 for m2 in range(m1+1, len(e_set)):
                     eid1=e_set[m1]; eid2=e_set[m2]

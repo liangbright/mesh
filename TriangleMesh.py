@@ -69,9 +69,16 @@ class TriangleMesh(PolygonMesh):
         temp1=torch.cross(x1-x0, x2-x0, dim=-1)
         temp2=torch.norm(temp1, p=2, dim=1, keepdim=True)
         area=0.5*temp2.abs()
-        temp2=temp2.clamp(min=1e-12)
+        with torch.no_grad():
+            #https://github.com/pytorch/pytorch/issues/43211
+            temp2.data.clamp_(min=1e-12)
         normal=temp1/temp2
         return area, normal
+
+    @staticmethod
+    def cal_element_normal(node, element):
+        element_area, element_normal=TriangleMesh.cal_element_area_and_normal(node, element)
+        return element_normal
 
     @staticmethod
     def cal_element_corner_angle(node, element):

@@ -18,12 +18,15 @@ class TetrahedronMesh(PolyhedronMesh):
         self.mesh_type='polyhedron_tet4'
 
     def build_edge(self):
+        element=self.element
+        if isinstance(element, torch.Tensor):
+            element=element.detach().cpu().numpy()
         edge=[]
-        for m in range(0, len(self.element)):
-            id0=self.element[m][0]
-            id1=self.element[m][1]
-            id2=self.element[m][2]
-            id3=self.element[m][3]
+        for m in range(0, len(element)):
+            id0=element[m][0]
+            id1=element[m][1]
+            id2=element[m][2]
+            id3=element[m][3]
             if id0 < id1:
                 edge.append([id0, id1])
             else:
@@ -51,7 +54,6 @@ class TetrahedronMesh(PolyhedronMesh):
         edge=torch.tensor(edge, dtype=torch.int64)
         edge=torch.unique(edge, dim=0, sorted=True)
         self.edge=edge
-        self.build_map_node_pair_to_edge()
 
     def cal_element_volumn(self):
         #need C3D4 element
@@ -61,14 +63,17 @@ class TetrahedronMesh(PolyhedronMesh):
         #draw a 3D figure and code this...
         pass
 
-    def get_sub_mesh(self, element_idx_list):
+    def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
         #element.shape (M,4)
         element_sub=self.element[element_idx_list]
-        node_idlist, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
-        node_out=self.node[node_idlist]
+        node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
+        node_out=self.node[node_idx_list]
         element_out=element_out.view(-1,4)
         mesh_new=TetrahedronMesh(node_out, element_out)
-        return mesh_new
+        if return_node_idx_list == False:
+            return mesh_new
+        else:
+            return mesh_new, node_idx_list
 #%%
 if __name__ == "__main__":
     pass

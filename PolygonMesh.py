@@ -36,17 +36,36 @@ class PolygonMesh(Mesh):
         data["PointAndFace"]=filename.split("/")[-1]+".vtk"
         with open(filename, "w") as outfile:
             json.dump(data, outfile, indent=4)
-        self.save_as_vtk(filename+".vtk", ascii=True, vtk42=True, use_vtk=False)
+        self.save_as_vtk(filename+".vtk", vtk42=True, use_vtk=False)
+
+    def load_from_mdk_json(self, filename, dtype):
+        self.load_from_vtk(filename+".vtk", dtype)
+        with open(filename) as f:
+            data=json.load(f)
+        for k in range(0, data["PointSetCount"]):
+            temp=data["PointSetList"][k]
+            name=list(temp.keys())[0]
+            value=list(temp.values())[0]
+            self.node_set[name]=value
+        for k in range(0, data["FaceSetCount"]):
+            temp=data["FaceSetList"][k]
+            name=list(temp.keys())[0]
+            value=list(temp.values())[0]
+            self.element_set[name]=value
+        self.name=data["Name"]
 
     def build_edge(self):
+        element=self.element
+        if isinstance(element, torch.Tensor):
+            element=element.detach().cpu().numpy()
         edge=[]
-        for m in range(0, len(self.element)):
-            elm=self.element[m]
+        for m in range(0, len(element)):
+            elm=element[m]
             for k in range(0, len(elm)):
                 if k < len(elm)-1:
-                    a=int(elm[k]); b=int(elm[k+1])
+                    a=elm[k]; b=elm[k+1]
                 else:
-                    a=int(elm[k]); b=int(elm[0])
+                    a=elm[k]; b=elm[0]
                 if a < b:
                     edge.append([a, b])
                 else:
@@ -54,11 +73,8 @@ class PolygonMesh(Mesh):
         edge=torch.tensor(edge, dtype=torch.int64)
         edge=torch.unique(edge, dim=0, sorted=True)
         self.edge=edge
-        self.build_map_node_pair_to_edge()
 
     def build_element_to_edge_adj_table(self):
-        if self.map_node_pair_to_edge is None:
-            self.build_map_node_pari_to_edge()
         element=self.element
         if isinstance(element, torch.Tensor):
             element=element.detach().cpu().numpy()
@@ -66,11 +82,11 @@ class PolygonMesh(Mesh):
         for m in range(0, len(element)):
             elm=element[m]
             for n in range(0, len(elm)):
-                idx_n=int(elm[n])
+                idx_n=elm[n]
                 if n < len(elm)-1:
-                    idx_n1=int(elm[n+1])
+                    idx_n1=elm[n+1]
                 else:
-                    idx_n1=int(elm[0])
+                    idx_n1=elm[0]
                 edge_idx=self.get_edge_idx_from_node_pair(idx_n, idx_n1)
                 if edge_idx is None:
                     raise ValueError('edge_idx is None')
@@ -84,12 +100,13 @@ class PolygonMesh(Mesh):
         if self.edge_to_element_adj_table is None:
             self.build_edge_to_element_adj_table()
         edge_to_element_adj_table=self.edge_to_element_adj_table
+        edge=self.edge.detach().cpu().numpy()
         boundary=[]
-        for k in range(0, len(self.edge)):
+        for k in range(0, len(edge)):
             adj_elm_idx=edge_to_element_adj_table[k]
             if len(adj_elm_idx) <= 1:
-                boundary.append(int(self.edge[k,0]))
-                boundary.append(int(self.edge[k,1]))
+                boundary.append(edge[k,0])
+                boundary.append(edge[k,1])
         boundary=np.unique(boundary).tolist()
         return boundary
 
@@ -144,8 +161,9 @@ class PolygonMesh(Mesh):
         else:
             return False
 
-    def quad_to_tri(self):
+    def quad_to_tri(self, mode=0):
         #inplace function to divide every quad element to two triangle elements
+        #self.clear_adj_info() is called inside this function
         if isinstance(self.element, torch.Tensor):
             if len(self.element[0]) == 3:
                 #this is TriangleMesh
@@ -161,14 +179,21 @@ class PolygonMesh(Mesh):
                 # |       |
                 # |       |
                 # x0------x1
-                # cut along x0-x2
+                # mode=0: cut along x0-x2
+                # mode=1: cut along x1-x3
                 #-----------
                 id0=int(elm[0])
                 id1=int(elm[1])
                 id2=int(elm[2])
                 id3=int(elm[3])
-                element_new.append([id0, id2, id3])
-                element_new.append([id0, id1, id2])
+                if mode == 0:
+                    element_new.append([id0, id2, id3])
+                    element_new.append([id0, id1, id2])
+                elif mode == 1:
+                    element_new.append([id0, id1, id3])
+                    element_new.append([id1, id2, id3])
+                else:
+                    raise ValueError("mode is invalid")
                 m_list.append(3)
                 flag=True
             elif len(elm) == 3:

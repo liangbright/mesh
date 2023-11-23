@@ -6,7 +6,6 @@ Created on Sat Mar 27 22:24:13 2021
 """
 import torch
 import torch_scatter
-from torch_sparse import SparseTensor
 from PolygonMesh import PolygonMesh
 import PolygonMeshProcessing as pmp
 #%%
@@ -22,14 +21,13 @@ class QuadMesh(PolygonMesh):
         self.element_corner_angle=None
 
     def update_node_normal(self, angle_weighted=True):
-        self.node_normal=QuadMesh.cal_node_normal(self.node, self.element,
-                                                  angle_weighted=angle_weighted, normalization=True)
+        self.node_normal=QuadMesh.cal_node_normal(self.node, self.element, angle_weighted=angle_weighted)
         error=torch.isnan(self.node_normal).sum()
         if error > 0:
             print("error: nan in normal_quad @ TriangleMesh:update_node_normal")
 
     @staticmethod
-    def cal_node_normal(node, element, angle_weighted=True, normalization=True):
+    def cal_node_normal(node, element, angle_weighted=True):
         x0=node[element[:,0]]
         x1=node[element[:,1]]
         x2=node[element[:,2]]
@@ -76,11 +74,10 @@ class QuadMesh(PolygonMesh):
         error=torch.isnan(normal).sum()
         if error > 0:
             print("error: nan in normal_quad @ QuadMesh:cal_node_normal")
-        if normalization == True:
-            normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
-            with torch.no_grad():
-                normal_norm.data.clamp_(min=1e-12)
-            normal=normal/normal_norm
+        normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
+        with torch.no_grad():
+            normal_norm.data.clamp_(min=1e-12)
+        normal=normal/normal_norm
         normal=normal.contiguous()
         return normal
 
@@ -110,16 +107,6 @@ class QuadMesh(PolygonMesh):
             temp.data.clamp_(min=1e-12)
         normal=cross_uv/temp
         return area, normal
-
-    @staticmethod
-    def cal_element_area(node, element):
-        area, normal= QuadMesh.cal_element_area_and_normal(node, element)
-        return area
-
-    @staticmethod
-    def cal_element_normal(node, element):
-        area, normal= QuadMesh.cal_element_area_and_normal(node, element)
-        return normal
 
     @staticmethod
     def cal_element_corner_angle(node, element):
@@ -155,27 +142,18 @@ class QuadMesh(PolygonMesh):
         x=a[2]*(a[0]*x0+(1-a[0])*x1)+(1-a[2])*(a[1]*x2+(1-a[1])*x3)
         return x
 
-    def subdivide_elements(self):
-         self.node, self.element = QuadMesh.subdivide(self.node, self.element)
-
     def subdivide(self):
-        #return a new mesh
-        #add a node in the middle of each element
-        nodeA=self.node[self.element].mean(dim=1) #(N,3) => (M,8,3) => (M,3)
+        #return a new mesh        
         #add a node in the middle of each edge
         if self.edge is None:
             self.build_edge()
         x_j=self.node[self.edge[:,0]]
         x_i=self.node[self.edge[:,1]]
-        nodeB=(x_j+x_i)/2
+        nodeA=(x_j+x_i)/2        
+        #add a node in the middle of each element
+        nodeB=self.node[self.element].mean(dim=1) #(N,3) => (M,8,3) => (M,3)
         #create new mesh
         node_new=torch.cat([self.node, nodeA, nodeB], dim=0)
-        #adj matrix for nodeB
-        adj=SparseTensor(row=self.edge[:,0],
-                         col=self.edge[:,1],
-                         value=torch.arange(self.node.shape[0]+nodeA.shape[0],
-                                            self.node.shape[0]+nodeA.shape[0]+nodeB.shape[0]),
-                         sparse_sizes=(nodeB.shape[0], nodeB.shape[0]))
         element_new=[]
         if torch.is_tensor(self.element):
             element=self.element.cpu().numpy()
@@ -186,35 +164,21 @@ class QuadMesh(PolygonMesh):
             # |   |   |
             # x0--x4--x1
             #-----------
-            id0=element[m,0].item()
-            id1=element[m,1].item()
-            id2=element[m,2].item()
-            id3=element[m,3].item()
-            if id0 < id1:
-                id4=adj[id0, id1].to_dense().item()
-            else:
-                id4=adj[id1, id0].to_dense().item()
-            if id1 < id2:
-                id5=adj[id1, id2].to_dense().item()
-            else:
-                id5=adj[id2, id1].to_dense().item()
-            if id2 < id3:
-                id6=adj[id2, id3].to_dense().item()
-            else:
-                id6=adj[id3, id2].to_dense().item()
-            if id3 < id0:
-                id7=adj[id3, id0].to_dense().item()
-            else:
-                id7=adj[id0, id3].to_dense().item()
-            id8=self.node.shape[0]+m
+            id0=int(element[m][0])
+            id1=int(element[m][1])
+            id2=int(element[m][2])
+            id3=int(element[m][3])
+            id4=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id1)
+            id5=self.node.shape[0]+self.get_edge_idx_from_node_pair(id1, id2)
+            id6=self.node.shape[0]+self.get_edge_idx_from_node_pair(id2, id3)
+            id7=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id3)            
+            id8=self.node.shape[0]+nodeA.shape[0]+m
             element_new.append([id0, id4, id8, id7])
             element_new.append([id4, id1, id5, id8])
             element_new.append([id7, id8, id6, id3])
             element_new.append([id8, id5, id2, id6])
         element_new=torch.tensor(element_new, dtype=torch.int64, device=self.element.device)
-        mesh_new=QuadMesh()
-        mesh_new.node=node_new
-        mesh_new.element=element_new
+        mesh_new=QuadMesh(node_new, element_new)
         return mesh_new
 
     def get_sub_mesh(self, element_id_list, return_node_idx_list=False):
@@ -222,9 +186,7 @@ class QuadMesh(PolygonMesh):
         node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_new=self.node[node_idx_list]
         element_new=element_out.view(-1,4)
-        mesh_new=QuadMesh()
-        mesh_new.node=node_new
-        mesh_new.element=element_new
+        mesh_new=QuadMesh(node_new, element_new)
         if return_node_idx_list == False:
             return mesh_new
         else:

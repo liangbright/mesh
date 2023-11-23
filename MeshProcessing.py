@@ -20,30 +20,36 @@ def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
     if len(VectorB.shape) == 1:
         VectorB=VectorB.view(1,3)
     
+    if VectorA.dtype != VectorB.dtype:
+        raise ValueError
+    
     if VectorA.dtype == np.float32 or VectorA.dtype == torch.float32:
-        eps=1e-7 # torch.acos grad issue, it must be 1e-7
+        eps1=1e-12
+        eps2=1e-7 # torch.acos grad issue, it must be 1e-7        
     elif VectorA.dtype == np.float64 or VectorA.dtype == torch.float64:
-        eps=1e-16
+        eps1=1e-12
+        eps2=1e-16
     
     if isinstance(VectorA, np.ndarray) and isinstance(VectorA, np.ndarray):
         L2Norm_A = np.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
         L2Norm_B = np.sqrt(VectorB[:,0]*VectorB[:,0]+VectorB[:,1]*VectorB[:,1]+VectorB[:,2]*VectorB[:,2])
-        if np.any(L2Norm_A <= eps) or np.any(L2Norm_B <= eps):
+        if np.any(L2Norm_A <= eps1) or np.any(L2Norm_B <= eps1):
             print("L2Norm <= eps, np.clip to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
-            L2Norm_A=np.clip(L2Norm_A, min=eps)
-            L2Norm_B=np.clip(L2Norm_B, min=eps)
+        L2Norm_A=np.clip(L2Norm_A, min=eps1)
+        L2Norm_B=np.clip(L2Norm_B, min=eps1)
         CosTheta = (VectorA[:,0]*VectorB[:,0]+VectorA[:,1]*VectorB[:,1]+VectorA[:,2]*VectorB[:,2])/(L2Norm_A*L2Norm_B);
         CosTheta = np.clip(CosTheta, min=-1, max=1)
         Theta = np.arccos(CosTheta) #[0, pi], acos(-1) = pi
     elif isinstance(VectorA, torch.Tensor) and isinstance(VectorA,  torch.Tensor):
         L2Norm_A = torch.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
         L2Norm_B = torch.sqrt(VectorB[:,0]*VectorB[:,0]+VectorB[:,1]*VectorB[:,1]+VectorB[:,2]*VectorB[:,2])
-        if torch.any(L2Norm_A <= eps) or torch.any(L2Norm_B <= eps):
+        if torch.any(L2Norm_A <= eps1) or torch.any(L2Norm_B <= eps1):
             print("L2Norm <= eps, torch.clamp to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
-            L2Norm_A=torch.clamp(L2Norm_A, min=eps)
-            L2Norm_B=torch.clamp(L2Norm_B, min=eps)
+        with torch.no_grad():
+            L2Norm_A.data.clamp_(min=eps1)
+            L2Norm_B.data.clamp_(min=eps1)                
         CosTheta = (VectorA[:,0]*VectorB[:,0]+VectorA[:,1]*VectorB[:,1]+VectorA[:,2]*VectorB[:,2])/(L2Norm_A*L2Norm_B);              
-        CosTheta = torch.clamp(CosTheta, min=-1+eps, max=1-eps)
+        CosTheta = torch.clamp(CosTheta, min=-1+eps2, max=1-eps2)
         Theta = torch.acos(CosTheta) #[0, pi], acos(-1) = pi
     return Theta
     '''

@@ -6,12 +6,10 @@ Created on Sat Mar 27 22:24:13 2021
 """
 import numpy as np
 import torch
-import torch_scatter
 from torch_sparse import SparseTensor
 from PolygonMesh import PolygonMesh
 from QuadMesh import QuadMesh
 from TriangleMesh import TriangleMesh
-from copy import deepcopy
 #%%
 class QuadTriangleMesh(PolygonMesh):
     #element could be quad or triangle
@@ -78,29 +76,34 @@ class QuadTriangleMesh(PolygonMesh):
         super().copy(node, element, dtype, detach)
         self.classify_element()
 
-    def update_node_normal(self, angle_weighted=False):
+    def update_node_normal(self, angle_weighted=True):
         if self.quad_element is None or self.tri_element is None:
             self.classify_element()
         normal_quad=0
         if len(self.quad_element) > 0:
-            normal_quad=QuadMesh.cal_node_normal(self.node, self.quad_element,
-                                                 angle_weighted=angle_weighted, normalization=False)
+            normal_quad=QuadMesh.cal_node_normal(self.node, self.quad_element, angle_weighted=angle_weighted)
             error=torch.isnan(normal_quad).sum()
             if error > 0:
                 print("error: nan in normal_quad @ QuadTriangleMesh:update_node_normal")
         normal_tri=0
         if len(self.tri_element) > 0:
-            normal_tri=TriangleMesh.cal_node_normal(self.node, self.tri_element,
-                                                    angle_weighted=angle_weighted, normalization=False)
+            normal_tri=TriangleMesh.cal_node_normal(self.node, self.tri_element, angle_weighted=angle_weighted)
             error=torch.isnan(normal_tri).sum()
             if error > 0:
                 print("error: nan in normal_tri @ QuadTriangleMesh:update_node_normal")
         normal=normal_quad+normal_tri
         normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
-        normal_norm=normal_norm.clamp(min=1e-12)
+        with torch.no_grad():
+            normal_norm.data.clamp_(min=1e-12)
         normal=normal/normal_norm
         normal=normal.contiguous()
         self.node_normal=normal
+    
+    @staticmethod
+    def cal_node_normal(node, element, angle_weighted=True):
+        temp=QuadTriangleMesh(node, element)
+        temp.update_node_normal(angle_weighted=angle_weighted)
+        return temp.node_normal
 
     def update_element_area_and_normal(self):
         if self.quad_element is None or self.tri_element is None:
@@ -117,6 +120,12 @@ class QuadTriangleMesh(PolygonMesh):
             normal[self.tri_element_idx]=normal_tri
         self.element_area=area
         self.element_normal=normal
+        
+    @staticmethod
+    def cal_element_area_and_normal(node, element):
+        temp=QuadTriangleMesh(node, element)
+        temp.update_element_area_and_normal()
+        return temp.element_area, temp.element_normal
 
     def update_element_corner_angle(self):
         if self.quad_element is None or self.tri_element is None:
@@ -125,7 +134,13 @@ class QuadTriangleMesh(PolygonMesh):
             self.quad_element_corner_angle = QuadMesh.cal_element_corner_angle(self.node, self.quad_element)
         if len(self.tri_element) > 0:
             self.tri_element_corner_angle = TriangleMesh.cal_element_corner_angle(self.node, self.tri_element)
-
+    
+    @staticmethod
+    def cal_element_corner_angle(node, element):
+        temp=QuadTriangleMesh(node, element)
+        temp.update_element_area_and_normal()
+        return temp.quad_element_corner_angle, temp.tri_element_corner_angle
+        
     def subdivide(self):
         #return a new mesh
         if self.quad_element is None or self.tri_element is None:

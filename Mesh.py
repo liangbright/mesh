@@ -111,9 +111,7 @@ class Mesh:
                 dtype=torch.float64
             else:
                 raise ValueError('unsupported dtype:'+str(dtype))
-        if 'polyhedron' in self.mesh_type:
-            raise ValueError('unsupported')
-        elif 'polygon' in self.mesh_type:
+        if 'polygon' in self.mesh_type:
             reader = vtk.vtkSTLReader()
         else:
             raise ValueError('unsupported mesh_type:'+self.mesh_type)
@@ -501,7 +499,7 @@ class Mesh:
         elif len(temp) == 1:
             edge_idx=int(temp.item())
         else:
-            raise ValueError("more than one edge between node "+str(nodeA_idx)+" and node"+str(nodeB_idx))
+            raise ValueError("more than one edge between node "+str(nodeA_idx)+" and node "+str(nodeB_idx))
         return edge_idx
 
     def update_edge_length(self):

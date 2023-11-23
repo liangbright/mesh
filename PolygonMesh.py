@@ -99,17 +99,43 @@ class PolygonMesh(Mesh):
             self.build_edge()
         if self.edge_to_element_adj_table is None:
             self.build_edge_to_element_adj_table()
-        edge_to_element_adj_table=self.edge_to_element_adj_table
         edge=self.edge.detach().cpu().numpy()
         boundary=[]
         for k in range(0, len(edge)):
-            adj_elm_idx=edge_to_element_adj_table[k]
-            if len(adj_elm_idx) <= 1:
+            adj_elm_idx=self.edge_to_element_adj_table[k]
+            if len(adj_elm_idx) == 1:
                 boundary.append(edge[k,0])
                 boundary.append(edge[k,1])
         boundary=np.unique(boundary).tolist()
         return boundary
-
+    
+    def find_boundary_element(self, adj):
+        #return index list of elements on boundary
+        if adj == "edge":
+            if self.edge is None:
+                self.build_edge()
+            if self.edge_to_element_adj_table is None:
+                self.build_edge_to_element_adj_table()
+            edge=self.edge.detach().cpu().numpy()
+            boundary=[]
+            for k in range(0, len(edge)):
+                adj_elm_idx=self.edge_to_element_adj_table[k]
+                if len(adj_elm_idx) == 1:
+                    boundary.append(adj_elm_idx[0])
+            boundary=np.unique(boundary).tolist()
+            return boundary
+        elif adj == "node":
+            boundary_node=self.find_boundary_node()
+            if self.node_to_element_adj_table is None:
+                self.build_node_to_element_adj_table()
+            boundary=[]
+            for node_idx in boundary_node:
+                adj_elm_idx=self.node_to_element_adj_table[node_idx]
+                boundary.extend(adj_elm_idx)
+            return boundary
+        else:
+            raise ValueError
+        
     def is_quad(self):
         if isinstance(self.element, torch.Tensor):
             if len(self.element[0]) == 4:
@@ -192,6 +218,15 @@ class PolygonMesh(Mesh):
                 elif mode == 1:
                     element_new.append([id0, id1, id3])
                     element_new.append([id1, id2, id3])
+                elif mode == 'auto':
+                    L02=((self.node[id0]-self.node[id2])**2).sum()
+                    L13=((self.node[id1]-self.node[id3])**2).sum()
+                    if L02 < L13:
+                        element_new.append([id0, id2, id3])
+                        element_new.append([id0, id1, id2])
+                    else:
+                        element_new.append([id0, id1, id3])
+                        element_new.append([id1, id2, id3])
                 else:
                     raise ValueError("mode is invalid")
                 m_list.append(3)

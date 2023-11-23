@@ -6,7 +6,6 @@ Created on Sat Mar 27 22:24:13 2021
 """
 import torch
 import torch_scatter
-from torch_sparse import SparseTensor
 import numpy as np
 from PolygonMesh import PolygonMesh
 from QuadMesh import QuadMesh
@@ -24,14 +23,13 @@ class TriangleMesh(PolygonMesh):
 
     def update_node_normal(self, angle_weighted=True):
         self.element_area, self.element_normal=TriangleMesh.cal_element_area_and_normal(self.node, self.element)
-        self.node_normal=TriangleMesh.cal_node_normal(self.node, self.element, self.element_normal,
-                                                      angle_weighted=angle_weighted, normalization=True)
+        self.node_normal=TriangleMesh.cal_node_normal(self.node, self.element, angle_weighted, self.element_normal)
         error=torch.isnan(self.node_normal).sum()
         if error > 0:
             print("error: nan in normal_quad @ TriangleMesh:update_node_normal")
 
     @staticmethod
-    def cal_node_normal(node, element, element_normal=None, angle_weighted=True, normalization=True):
+    def cal_node_normal(node, element, angle_weighted=True, element_normal=None):
         if element_normal is None:
             element_area, element_normal=TriangleMesh.cal_element_area_and_normal(node, element)
         M=element.shape[0]
@@ -44,10 +42,10 @@ class TriangleMesh(PolygonMesh):
             weight=e_angle/e_angle.sum(dim=1, keepdim=True)
             e_normal=e_normal*weight.view(M*3,1)
         node_normal = torch_scatter.scatter(e_normal, element.view(-1), dim=0, dim_size=N, reduce="sum")
-        if normalization == True:
-            normal_norm=torch.norm(node_normal, p=2, dim=1, keepdim=True)
-            normal_norm=normal_norm.clamp(min=1e-12)
-            node_normal=node_normal/normal_norm
+        normal_norm=torch.norm(node_normal, p=2, dim=1, keepdim=True)
+        with torch.no_grad():
+            normal_norm.data.clamp_(min=1e-12)        
+        node_normal=node_normal/normal_norm
         node_normal=node_normal.contiguous()
         return node_normal
 
@@ -120,13 +118,7 @@ class TriangleMesh(PolygonMesh):
         x_i=self.node[self.edge[:,1]]
         nodeA=(x_j+x_i)/2
         #create new mesh
-        node_new=torch.cat([self.node, nodeA], dim=0)
-        #adj matrix for nodeA
-        adj=SparseTensor(row=self.edge[:,0],
-                         col=self.edge[:,1],
-                         value=torch.arange(self.node.shape[0],
-                                            self.node.shape[0]+nodeA.shape[0]),
-                         sparse_sizes=(nodeA.shape[0], nodeA.shape[0]))
+        node_new=torch.cat([self.node, nodeA], dim=0)        
         element=self.element
         if isinstance(self.element, torch.Tensor):
             element=element.cpu().numpy()
@@ -142,18 +134,9 @@ class TriangleMesh(PolygonMesh):
             id0=element[m,0].item()
             id1=element[m,1].item()
             id2=element[m,2].item()
-            if id0 < id1:
-                id3=adj[id0, id1].to_dense().item()
-            else:
-                id3=adj[id1, id0].to_dense().item()
-            if id1 < id2:
-                id4=adj[id1, id2].to_dense().item()
-            else:
-                id4=adj[id2, id1].to_dense().item()
-            if id2 < id0:
-                id5=adj[id2, id0].to_dense().item()
-            else:
-                id5=adj[id0, id2].to_dense().item()
+            id3=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id1)
+            id4=self.node.shape[0]+self.get_edge_idx_from_node_pair(id1, id2)
+            id5=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id2)    
             element_new.append([id0, id3, id5])
             element_new.append([id3, id4, id5])
             element_new.append([id3, id1, id4])
@@ -174,12 +157,6 @@ class TriangleMesh(PolygonMesh):
         nodeB=self.node[self.element].mean(dim=1)
         #create new mesh
         node_new=torch.cat([self.node, nodeA, nodeB], dim=0)
-        #adj matrix for nodeA
-        adj=SparseTensor(row=self.edge[:,0],
-                         col=self.edge[:,1],
-                         value=torch.arange(self.node.shape[0],
-                                            self.node.shape[0]+nodeA.shape[0]),
-                         sparse_sizes=(nodeA.shape[0], nodeA.shape[0]))
         element=self.element
         if isinstance(self.element, torch.Tensor):
             element=element.cpu().numpy()
@@ -194,21 +171,12 @@ class TriangleMesh(PolygonMesh):
             # /   |    \
             #x0---x3---x1
             #-----------
-            id0=element[m,0].item()
-            id1=element[m,1].item()
-            id2=element[m,2].item()
-            if id0 < id1:
-                id3=adj[id0, id1].to_dense().item()
-            else:
-                id3=adj[id1, id0].to_dense().item()
-            if id1 < id2:
-                id4=adj[id1, id2].to_dense().item()
-            else:
-                id4=adj[id2, id1].to_dense().item()
-            if id2 < id0:
-                id5=adj[id2, id0].to_dense().item()
-            else:
-                id5=adj[id0, id2].to_dense().item()
+            id0=int(element[m][0])
+            id1=int(element[m][1])
+            id2=int(element[m][2])
+            id3=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id1)
+            id4=self.node.shape[0]+self.get_edge_idx_from_node_pair(id1, id2)
+            id5=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id2)
             id6=self.node.shape[0]+nodeA.shape[0]+m
             element_new.append([id6, id5, id0, id3])
             element_new.append([id6, id3, id1, id4])

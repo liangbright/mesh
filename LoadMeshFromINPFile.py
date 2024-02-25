@@ -11,6 +11,8 @@ def read_abaqus_inp(filename, remove_unused_node):
         inp=file.readlines()
         print('total number of lines in inp:', len(inp))
     #-----------
+    inp=fix_inp_element(inp)
+    #-----------
     node, node_id=read_node(inp)
     print('total number of nodes:', len(node))
     element, element_id, element_type, element_set=read_element(inp)
@@ -21,13 +23,18 @@ def read_abaqus_inp(filename, remove_unused_node):
     element=np.array(element, dtype='object')
     element_id=np.array(element_id)
     element_type=np.array(element_type, dtype='object')
+    #-----------    
+    elset=read_elset(inp)
+    element_set=element_set | elset # merge
     #-----------
-    node, node_id, element=clean_data_re_label_node(node, node_id, element)
+    node_set=read_nset(inp)    
+    #-----------
+    out=clean_data_re_label_node_element(node, node_id, node_set, element, element_id, element_set)
+    node, node_id, node_set, element, element_id, element_set=out
     if remove_unused_node == True:
         node, node_id, element=clean_data_remove_unused_node(node, node_id, element)
     #-----------
-    element=element.tolist()
-    return node, node_id, element, element_id, element_type, element_set
+    return node, node_id, node_set, element, element_id, element_type, element_set
 #%%
 def read_node(inp):
     node=[]
@@ -53,6 +60,41 @@ def read_node(inp):
         node.append([float(temp[1]), float(temp[2]), float(temp[3])])
     return node, node_id
 #%%
+def fix_inp_element(inp):
+    #the node indexes of an element may span multiple lines
+    #this function will convert those lines of an element into one line
+    for k in range(0, len(inp)):
+        inp[k]=inp[k].replace(" ", "")
+    end_index=0
+    while True:
+        start_index=None
+        for k in range(end_index, len(inp)):
+            if "*element" in inp[k].lower():
+                start_index=k+1
+                break
+        if start_index is None:
+            break  
+        end_index=len(inp)-1
+        for k in range(start_index, len(inp)):
+            if "*" in inp[k]:
+                end_index=k
+                break
+        lines=inp[start_index:end_index]
+        flag=False
+        for k in range(0, len(lines)):
+            if inp[start_index+k][-2].isdigit() == False:
+                flag=True
+                break
+        if flag == True:
+            out=[""]
+            for k in range(0, len(lines)):
+                out[-1]=out[-1]+inp[start_index+k][:-1]
+                if inp[start_index+k][-2].isdigit() == True:
+                    if k < len(lines)-1:
+                        out.append("")
+            inp=inp[:start_index]+out+inp[end_index:]
+    return inp
+#%%
 def read_element(inp):
     element=[]
     element_id=[]
@@ -75,10 +117,11 @@ def read_element(inp):
                 eltype=v.split("=")[-1]
                 eltype=eltype.replace("\n", "")
                 eltype=eltype.replace(" ", "")
+                eltype=eltype.upper()
                 break
         elset=None
         for v in temp:
-            if "elset" in v.lower():
+            if "elset=" in v.lower():
                 elset=v.split('=')[-1]
                 elset=elset.replace("\n", "")
                 break
@@ -99,23 +142,116 @@ def read_element(inp):
             element.append(temp[1:])
             element_type.append(eltype)
             if elset is not None:
-                element_set[elset].append(len(element)-1)#len(element)-1 is the index of the current element
+                element_set[elset].append(element_id[-1])
     return element, element_id, element_type, element_set
 #%%
-def clean_data_re_label_node(node, node_id, element):
+def read_elset(inp):
+    # read *Elset
+    element_set={}
+    lineindexlist=[]
+    for k in range(0, len(inp)):
+        if "*elset" in inp[k].lower():
+            lineindexlist.append(k)
+    for lineindex in lineindexlist:
+        k=lineindex
+        temp=inp[k].replace(" ", "").split(",")
+        name=None
+        for v in temp:
+            if "elset=" in v.lower():
+                name=v.split('=')[-1]
+                name=name.replace("\n", "")
+                break
+        if name not in element_set.keys():
+            element_set[name]=[]
+        generate=False
+        for v in temp:
+            if "generate" in v.lower():
+                generate=True
+                break
+        if generate == True:
+            num=inp[k+1].replace(" ", "").split(",")
+            element_set[name]=np.arange(int(num[0]), int(num[1])+1).tolist()
+            continue
+        while True:
+            k=k+1
+            if k >= len(inp):
+                break
+            if "*" in inp[k]:
+                break
+            temp=inp[k].replace(" ", "")
+            temp=temp.split(",")
+            temp=[int(a) for a in temp]
+            element_set[name].extend(temp)
+    return element_set
+#%%
+def read_nset(inp):
+    # read *Nset
+    node_set={}
+    lineindexlist=[]
+    for k in range(0, len(inp)):
+        if "*nset" in inp[k].lower():
+            lineindexlist.append(k)
+    for lineindex in lineindexlist:
+        k=lineindex
+        temp=inp[k].replace(" ", "")
+        temp=temp.split(",")
+        name=None
+        for v in temp:
+            if "nset=" in v.lower():
+                name=v.split('=')[-1]
+                name=name.replace("\n", "")
+                break
+        if name not in node_set.keys():
+            node_set[name]=[]
+        generate=False
+        for v in temp:
+            if "generate" in v.lower():
+                generate=True
+                break
+        if generate == True:
+            num=inp[k+1].replace(" ", "").split(",")
+            node_set[name]=np.arange(int(num[0]), int(num[1])+1).tolist()
+            continue
+        while True:
+            k=k+1
+            if k >= len(inp):
+                break
+            if "*" in inp[k]:
+                break
+            temp=inp[k].replace(" ", "")
+            temp=temp.split(",")
+            temp=[int(a) for a in temp]
+            node_set[name].extend(temp)
+    return node_set
+#%%
+def clean_data_re_label_node_element(node, node_id, node_set, element, element_id, element_set):
     #node_id could start from an arbitrary number, e.g, 1000
     #sort node by id
-    idx_sorted=np.argsort(node_id)
-    node=node[idx_sorted]
-    node_id=node_id[idx_sorted]
+    node_idx_sorted=np.argsort(node_id)
+    node=node[node_idx_sorted]
+    node_id=node_id[node_idx_sorted]
     #map node id to index in node
-    map={}
+    map_node={}
     for n in range(0, len(node)):
-        map[node_id[n]]=n
+        map_node[node_id[n]]=n
+    for key, value in node_set.items():
+        value_new=[map_node[a] for a in value]
+        node_set[key]=value_new
     for m in range(0, len(element)):
         for n in range(0, len(element[m])):
-            element[m][n]=map[element[m][n]]
-    return node, node_id, element
+            element[m][n]=map_node[element[m][n]]
+    #sort element by id
+    elm_idx_sorted=np.argsort(element_id)
+    element=np.array(element)[elm_idx_sorted].tolist()
+    element_id=np.array(element_id)[elm_idx_sorted].tolist()
+    #map element id to index in element
+    map_elm={}
+    for n in range(0, len(element)):
+        map_elm[int(element_id[n])]=n
+    for key, value in element_set.items():
+        value_new=[map_elm[int(a)] for a in value]
+        element_set[key]=value_new    
+    return node, node_id, node_set, element, element_id, element_set
 #%%
 def clean_data_remove_unused_node(node, node_id, element):
     used_old_idx_list=[]

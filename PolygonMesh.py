@@ -55,6 +55,9 @@ class PolygonMesh(Mesh):
         self.name=data["Name"]
 
     def build_edge(self):
+        self.build_element_to_edge_adj_table()
+        
+    def build_element_to_edge_adj_table(self):
         element=self.element
         if isinstance(element, torch.Tensor):
             element=element.detach().cpu().numpy()
@@ -70,27 +73,14 @@ class PolygonMesh(Mesh):
                     edge.append([a, b])
                 else:
                     edge.append([b, a])
-        edge=torch.tensor(edge, dtype=torch.int64)
-        edge=torch.unique(edge, dim=0, sorted=True)
-        self.edge=edge
-
-    def build_element_to_edge_adj_table(self):
-        element=self.element
-        if isinstance(element, torch.Tensor):
-            element=element.detach().cpu().numpy()
+        edge=np.array(edge, dtype=np.int64)
+        edge_unique, inverse=np.unique(edge, return_inverse=True, axis=0)
+        self.edge=torch.tensor(edge_unique, dtype=torch.int64)
         adj_table=[[] for _ in range(len(self.element))]
+        idx=0
         for m in range(0, len(element)):
-            elm=element[m]
-            for n in range(0, len(elm)):
-                idx_n=elm[n]
-                if n < len(elm)-1:
-                    idx_n1=elm[n+1]
-                else:
-                    idx_n1=elm[0]
-                edge_idx=self.get_edge_idx_from_node_pair(idx_n, idx_n1)
-                if edge_idx is None:
-                    raise ValueError('edge_idx is None')
-                adj_table[m].append(edge_idx)
+            adj_table.append(inverse[idx:(idx+len(element[m]))])
+            idx=idx+len(element[m])        
         self.element_to_edge_adj_table=adj_table
 
     def find_boundary_node(self):

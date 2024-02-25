@@ -5,12 +5,13 @@ Created on Fri Nov  3 00:12:58 2023
 @author: liang
 """
 import torch
+from torch.linalg import norm
 import torch_scatter
 import numpy as np
 from Mesh import Mesh
 from copy import deepcopy
 #%%
-def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
+def ComputeAngleBetweenTwoVectorIn3D_slow(VectorA, VectorB):
     #angle from A to B, right hand rule
     #angle ~[0 ~2pi]
     #VectorA.shape (B,3)
@@ -62,6 +63,56 @@ def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB):
     print(x.grad)
     '''
 #%%
+def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB, return_cos=False):
+    #angle from A to B, right hand rule
+    #angle ~[0 ~2pi]
+    #VectorA.shape (B,3)
+    #VectorB.shape (B,3)
+    if len(VectorA.shape) == 1:
+        VectorA=VectorA.reshape(1,3)
+    if len(VectorB.shape) == 1:
+        VectorB=VectorB.reshape(1,3)
+    
+    if VectorA.dtype != VectorB.dtype:
+        raise ValueError
+    
+    if VectorA.dtype == np.float32 or VectorA.dtype == torch.float32:
+        eps1=1e-12
+        eps2=1e-7 # torch.acos grad issue, it must be 1e-7        
+    elif VectorA.dtype == np.float64 or VectorA.dtype == torch.float64:
+        eps1=1e-12
+        eps2=1e-16
+    
+    if isinstance(VectorA, np.ndarray) and isinstance(VectorA, np.ndarray):
+        L2Norm_A = np.linalg.norm(VectorA, ord=2, axis=-1)
+        L2Norm_B = np.linalg.norm(VectorB, ord=2, axis=-1)
+        if np.any(L2Norm_A <= eps1) or np.any(L2Norm_B <= eps1):
+            print("L2Norm <= eps, np.clip to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
+        L2Norm_A=np.clip(L2Norm_A, a_min=eps1, a_max=np.inf)
+        L2Norm_B=np.clip(L2Norm_B, a_min=eps1, a_max=np.inf)
+        CosTheta = np.sum(VectorA*VectorB, axis=-1)/(L2Norm_A*L2Norm_B);
+        CosTheta = np.clip(CosTheta, a_min=-1, a_max=1)
+        if return_cos == False:
+            Theta = np.arccos(CosTheta) #[0, pi], acos(-1) = pi
+            return Theta    
+        else:
+            return CosTheta
+    elif isinstance(VectorA, torch.Tensor) and isinstance(VectorA, torch.Tensor):
+        L2Norm_A=norm(VectorA, ord=2, dim=-1)
+        L2Norm_B=norm(VectorB, ord=2, dim=-1)        
+        if torch.any(L2Norm_A <= eps1) or torch.any(L2Norm_B <= eps1):
+            print("L2Norm <= eps, torch.clamp to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
+        with torch.no_grad():
+            L2Norm_A.data.clamp_(min=eps1)
+            L2Norm_B.data.clamp_(min=eps1)         
+        CosTheta = (VectorA*VectorB).sum(dim=-1)/(L2Norm_A*L2Norm_B);                      
+        if return_cos == False:
+            CosTheta = torch.clamp(CosTheta, min=-1+eps2, max=1-eps2)
+            Theta = torch.acos(CosTheta) #[0, pi], acos(-1) = pi
+            return Theta    
+        else:
+            return CosTheta
+#%%
 def FindConnectedRegion(mesh, ref_element_idx, adj):
     if not isinstance(mesh, Mesh):
         raise NotImplementedError
@@ -84,6 +135,17 @@ def FindConnectedRegion(mesh, ref_element_idx, adj):
         active_element_list=np.unique(new_active_element_list).tolist()
         region_element_list.extend(active_element_list)
     return region_element_list
+#%%
+def SegmentMeshToConnectedRegion(mesh, adj):
+    element_list=np.arange(0, len(mesh.element)).tolist()
+    region_list=[]
+    while True:
+        if len(element_list) == 0:
+            break
+        region=FindConnectedRegion(mesh, element_list[0], adj)
+        region_list.append(region)
+        element_list=list(set(element_list)-set(region))
+    return region_list
 #%%
 def SimpleSmoother(field, adj_link, lamda, mask, inplace):
     #field.shape (N, ?)
@@ -185,7 +247,8 @@ def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
     #The shared points are in node_idx_listA of meshA and node_idx_listB of meshB
     #if the distance between two nodes is <= distance_threshold, then merge the two nodes
     if (not isinstance(meshA, Mesh)) or (not isinstance(meshA, Mesh)):
-        raise NotImplementedError
+        #raise NotImplementedError
+        print("warning: input may not be Mesh @ MergeMesh")
     if meshA.node.shape[0] == 0 or meshB.node.shape[0] == 0:
         raise ValueError("meshA or meshB is empty")
 
@@ -246,4 +309,31 @@ def RemoveUnusedNode(mesh, return_node_idx_list=False, clear_adj_info=True):
         mesh.clear_adj_info()
     if return_node_idx_list == True:
         return node_idx_list
-
+#%%
+def FindNearestNode(mesh, point):
+    #point (K, 3) or (3,)
+    if not isinstance(point, (torch.Tensor, np.ndarray)):
+        raise ValueError("unsupported type "+str(type(point)))
+    if isinstance(point, np.ndarray):
+        point=torch.tensor(point, mesh.node.dtype)    
+    flag=(len(point.shape) == 1)
+    point=point.view(-1,3)
+    node_idx_list=[]
+    for n in range(0, len(point)):
+        p=point[n].view(1,-1)
+        d=((mesh.node-p)**2).sum(dim=-1)
+        idx=d.argmin()
+        node_idx_list.append(int(idx))    
+    if flag == False:
+        return node_idx_list
+    else:
+        return node_idx_list[0]
+    
+        
+        
+        
+        
+    
+    
+    
+    

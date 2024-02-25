@@ -5,6 +5,7 @@ Created on Sat Mar 27 22:24:13 2021
 @author: liang
 """
 import torch
+from torch.linalg import norm
 import torch_scatter
 import numpy as np
 from PolygonMesh import PolygonMesh
@@ -19,8 +20,8 @@ class TriangleMesh(PolygonMesh):
         self.node_normal=None
         self.element_area=None
         self.element_normal=None
-        self.element_corner_angle=None
-
+        self.element_corner_angle=None       
+        
     def update_node_normal(self, angle_weighted=True):
         self.element_area, self.element_normal=TriangleMesh.cal_element_area_and_normal(self.node, self.element)
         self.node_normal=TriangleMesh.cal_node_normal(self.node, self.element, angle_weighted, self.element_normal)
@@ -42,7 +43,8 @@ class TriangleMesh(PolygonMesh):
             weight=e_angle/e_angle.sum(dim=1, keepdim=True)
             e_normal=e_normal*weight.view(M*3,1)
         node_normal = torch_scatter.scatter(e_normal, element.view(-1), dim=0, dim_size=N, reduce="sum")
-        normal_norm=torch.norm(node_normal, p=2, dim=1, keepdim=True)
+        #normal_norm=torch.norm(node_normal, p=2, dim=1, keepdim=True)
+        normal_norm=norm(node_normal, ord=2, dim=1, keepdim=True)
         with torch.no_grad():
             normal_norm.data.clamp_(min=1e-12)        
         node_normal=node_normal/normal_norm
@@ -65,7 +67,8 @@ class TriangleMesh(PolygonMesh):
         # x0--x1
         #normal is undefined if area is 0
         temp1=torch.cross(x1-x0, x2-x0, dim=-1)
-        temp2=torch.norm(temp1, p=2, dim=1, keepdim=True)
+        #temp2=torch.norm(temp1, p=2, dim=1, keepdim=True)
+        temp2=norm(temp1, ord=2, dim=1, keepdim=True)
         area=0.5*temp2.abs()
         with torch.no_grad():
             #https://github.com/pytorch/pytorch/issues/43211
@@ -79,16 +82,16 @@ class TriangleMesh(PolygonMesh):
         return element_normal
 
     @staticmethod
-    def cal_element_corner_angle(node, element):
+    def cal_element_corner_angle(node, element, return_cos=False):
         x0=node[element[:,0]]
         x1=node[element[:,1]]
         x2=node[element[:,2]]
         #   x2
         #  /  \
         # x0--x1
-        angle0=pmp.ComputeAngleBetweenTwoVectorIn3D(x1-x0, x2-x0)
-        angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1)
-        angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x2, x1-x2)
+        angle0=pmp.ComputeAngleBetweenTwoVectorIn3D(x1-x0, x2-x0, return_cos)
+        angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1, return_cos)
+        angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x2, x1-x2, return_cos)
         angle=torch.cat([angle0.view(-1,1), angle1.view(-1,1), angle2.view(-1,1)], dim=1)
         return angle
 
@@ -131,9 +134,9 @@ class TriangleMesh(PolygonMesh):
             #  / \  / \
             # x0--x3--x1
             #-----------
-            id0=element[m,0].item()
-            id1=element[m,1].item()
-            id2=element[m,2].item()
+            id0=int(element[m][0])
+            id1=int(element[m][1])
+            id2=int(element[m][2])
             id3=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id1)
             id4=self.node.shape[0]+self.get_edge_idx_from_node_pair(id1, id2)
             id5=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id2)    
@@ -189,7 +192,7 @@ class TriangleMesh(PolygonMesh):
         element_sub=self.element[element_idx_list]
         node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_new=self.node[node_idx_list]
-        element_new=element_out.view(-1,3)
+        element_new=element_out.view(len(element_idx_list),-1)
         mesh_new=TriangleMesh(node_new, element_new)
         if return_node_idx_list == False:
             return mesh_new

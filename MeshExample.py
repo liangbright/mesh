@@ -3,7 +3,7 @@ import numpy as np
 from PolygonMeshProcessing import QuadMesh
 from HexahedronMesh import HexahedronMesh as HexMesh
 #%%
-def create_quad_cylinder_mesh(n_rings, n_points_per_ring, dtype=torch.float32, device=torch.device("cpu")):
+def create_quad_cylinder_mesh(n_rings, n_points_per_ring, dtype=torch.float32):
     theta=2*np.pi/n_points_per_ring
     node=np.zeros((n_rings*n_points_per_ring, 3))
     k=-1
@@ -23,9 +23,7 @@ def create_quad_cylinder_mesh(n_rings, n_points_per_ring, dtype=torch.float32, d
         for i in range(0, n_points_per_ring-1):
             element.append([idxA[i], idxA[i+1], idxB[i+1], idxB[i]])
         element.append([idxA[n_points_per_ring-1], idxA[0], idxB[0], idxB[n_points_per_ring-1]])
-    cylinder=QuadMesh()
-    cylinder.node=torch.tensor(node, dtype=dtype, device=device)
-    cylinder.element=torch.tensor(element, dtype=torch.int64, device=device)
+    cylinder=QuadMesh(node, element, dtype)
     return cylinder
 #%%
 def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):
@@ -51,11 +49,11 @@ def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):
             element[id,1]=map[y,x+1]
             element[id,2]=map[y+1,x+1]
             element[id,3]=map[y+1,x]
-    grid_mesh=QuadMesh(node, element)
+    grid_mesh=QuadMesh(node, element, dtype)
     grid_mesh.node_set['boundary']=boundary
     return grid_mesh
 #%%
-def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32, device=torch.device("cpu")):
+def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32):
     element=torch.zeros(((Nx-1)*(Ny-1)*(Nz-1), 8), dtype=torch.int64)
     grid=torch.zeros((Nx*Ny*Nz, 3), dtype=dtype)
     map=torch.zeros((Nz, Ny, Nx), dtype=torch.int64)
@@ -85,15 +83,13 @@ def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32, device=torch.device("c
                 element[id,5]=map[z+1,y,x+1]
                 element[id,6]=map[z+1,y+1,x+1]
                 element[id,7]=map[z+1,y+1,x]
-    grid_mesh=HexMesh()
-    grid_mesh.node=grid.to(device)
-    grid_mesh.element=element.to(device)
-    grid_mesh.node_set['boundary']=boundary.to(device)
+    grid_mesh=HexMesh(grid, element, dtype)
+    grid_mesh.node_set['boundary']=boundary
     return grid_mesh
 #%%
 if __name__ == '__main__':
     mesh0=create_quad_grid_mesh(10,20)
-    mesh0.save_by_vtk("D:/MLFEA/TAA/mesh/quad_grid_mesh_x10y20.vtk")
+    mesh0.save_as_vtk("D:/MLFEA/TAA/mesh/quad_grid_mesh_x10y20.vtk")
 
     mesh1=create_hex_grid_mesh(10,20,2)
-    mesh1.save_by_vtk("D:/MLFEA/TAA/mesh/hex_grid_mesh_x10y20z2.vtk")
+    mesh1.save_as_vtk("D:/MLFEA/TAA/mesh/hex_grid_mesh_x10y20z2.vtk")

@@ -14,14 +14,14 @@ from QuadMesh import QuadMesh
 from QuadTriangleMesh import QuadTriangleMesh
 from copy import deepcopy
 from MeshProcessing import SimpleSmoother, SimpleSmootherForMesh, ComputeAngleBetweenTwoVectorIn3D, TracePolyline, \
-                           IsCurveClosed, MergeMesh, FindConnectedRegion
+                            IsCurveClosed, MergeMesh, FindConnectedRegion, FindNearestNode
 try:
     import vtk
 except:
     print("cannot import vtk")
 #%%
-def TracePolygonMeshBoundaryCurve(mesh, node_idx):
-    #trace boundary starting from node_ix
+def TracePolygonMeshBoundaryCurve(mesh, node_idx, next_node_idx=None):
+    #trace boundary starting from node_ix -> next_node_idx -> ...
     #this function may not work well if two boundary curves share points
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
@@ -31,6 +31,11 @@ def TracePolygonMeshBoundaryCurve(mesh, node_idx):
     BoundaryCurve=[]
     if node_idx not in boundary:
         return BoundaryCurve
+    if next_node_idx is not None:
+        if next_node_idx not in boundary:
+            return BoundaryCurve
+        BoundaryCurve.append(node_idx)
+        node_idx=next_node_idx
     #---------
     if mesh.node_to_node_adj_table is None:
         mesh.build_node_to_node_adj_table()
@@ -118,6 +123,17 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx):
     #--------------
     return region_element_list
 #%%
+def SegmentMeshByCurve(mesh, node_curve_list):
+    element_list=np.arange(0, len(mesh.element)).tolist()
+    region_list=[]
+    while True:
+        if len(element_list) == 0:
+            break
+        region=ExtractRegionEnclosedByCurve(mesh, node_curve_list, element_list[0])
+        region_list.append(region)
+        element_list=list(set(element_list)-set(region))
+    return region_list
+#%%
 def SimpleSmootherForMeshNodeNormal(mesh, lamda, mask, n_iters, update_node_normal=True):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
@@ -138,13 +154,15 @@ def SimpleSmootherForMeshNodeNormal(mesh, lamda, mask, n_iters, update_node_norm
 def MergeMeshOnBoundary(mesh_list, distance_threshold):
     for mesh in mesh_list:
         if not isinstance(mesh, PolygonMesh):
-            raise NotImplementedError
+            #raise NotImplementedError
+            pass
     merged_mesh=mesh_list[0]
     for n in range(1, len(mesh_list)):
         mesh_n=mesh_list[n]
         merged_mesh=MergeMesh(merged_mesh, merged_mesh.find_boundary_node(),
                               mesh_n, mesh_n.find_boundary_node(),
                               distance_threshold)
+        merged_mesh=PolygonMesh(merged_mesh.node, merged_mesh.element)
     merged_mesh=PolygonMesh(merged_mesh.node, merged_mesh.element)
     return merged_mesh
 #%%

@@ -26,7 +26,7 @@ class Mesh:
         self.node=[] #Nx3
         self.element=[] #[e_1,...e_M], e1 is a list of node indexes in e1
         self.element_type=None #None then element_type will be infered by using mesh_type and node count per element
-        self.node_name_to_index={} #e.g., {'landmark1':10}
+        self.mapping_from_node_name_to_index={} #e.g., {'landmark1':10}
         self.node_set={} #e.g., {'set1':[0,1,2]}
         self.element_set={} #e.g., {'set1':[1,3,5]}
         self.node_data={} #e.g., {'stress':stress}, stress is Nx9 2D array
@@ -118,7 +118,29 @@ class Mesh:
         reader.SetFileName(filename)
         reader.Update()
         mesh_vtk = reader.GetOutput()
-        self.convert_mesh_vtk(mesh_vtk, dtype, filename)
+        self.read_mesh_vtk(mesh_vtk, dtype, filename)
+    
+    def load_from_vtp(self, filename, dtype):
+        if _Flag_VTK_IMPORT_ == False:
+            raise ValueError("vtk is not imported")
+        if isinstance(dtype, str):
+            if dtype == 'float32':
+                dtype=torch.float32
+            elif dtype == 'float64':
+                dtype=torch.float64
+            else:
+                raise ValueError('unsupported dtype:'+str(dtype))
+        if 'polygon' in self.mesh_type:
+            reader = vtk.vtkXMLPolyDataReader()
+        else:
+            raise ValueError('unsupported mesh_type:'+self.mesh_type)
+        reader.SetFileName(filename)
+        reader.Update()
+        mesh_vtk = reader.GetOutput()
+        try:
+            self.read_mesh_vtk(mesh_vtk, dtype)
+        except:
+            raise ValueError('cannot convert vtk data to mesh')
 
     def load_from_vtk(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
@@ -139,14 +161,17 @@ class Mesh:
         reader.SetFileName(filename)
         reader.Update()
         mesh_vtk = reader.GetOutput()
-        self.convert_mesh_vtk(mesh_vtk, dtype, filename)
+        try:
+            self.read_mesh_vtk(mesh_vtk, dtype)
+        except:
+            raise ValueError('cannot convert vtk data to mesh')
 
-    def convert_mesh_vtk(self, mesh_vtk, dtype, filename):
+    def read_mesh_vtk(self, mesh_vtk, dtype):
         node=np.zeros((mesh_vtk.GetNumberOfPoints(), 3))
         for n in range(mesh_vtk.GetNumberOfPoints()):
             node[n]=mesh_vtk.GetPoint(n)
         if len(node) == 0:
-            raise ValueError('cannot load node from '+filename)
+            raise ValueError('cannot load node')
         element=[]
         m_list=[]
         for n in range(mesh_vtk.GetNumberOfCells()):
@@ -157,7 +182,7 @@ class Mesh:
                 temp.append(cell_n.GetPointId(k))
             element.append(temp)
         if len(element) == 0:
-            raise ValueError('cannot load element from '+filename)
+            raise ValueError('cannot load element')
         self.node=torch.tensor(node, dtype=dtype)
         self.element=element
         if min(m_list) == max(m_list):
@@ -302,8 +327,23 @@ class Mesh:
         writer.SetInputData(mesh_vtk)
         writer.SetFileName(filename)
         writer.Write()
+    
+    def save_as_vtp(self, filename):
+        if _Flag_VTK_IMPORT_ == False:            
+            raise ValueError('vtk is not imported')
+        #-----------------------------
+        mesh_vtk=self.convert_to_vtk()
+        if mesh_vtk is None:
+            return
+        if 'polygon' in self.mesh_type:
+            writer=vtk.vtkXMLPolyDataWriter()
+        else:
+            raise ValueError('unsupported mesh_type: '+self.mesh_type)
+        writer.SetInputData(mesh_vtk)
+        writer.SetFileName(filename)
+        writer.Write()        
 
-    def save_as_torch(self, filename, save_adj_info=False):
+    def save_as_torch(self, filename, save_adj_info=True):
         data={"mesh_type":self.mesh_type,
               "node":self.node,
               "element":self.element,
@@ -312,7 +352,7 @@ class Mesh:
               "node_data":self.node_data,
               "element_data":self.element_data,
               "mesh_data":self.mesh_data,
-              "node_name_to_index":self.node_name_to_index}
+              "mapping_from_node_name_to_index":self.mapping_from_node_name_to_index}
         if save_adj_info == True:
             data["edge"]=self.edge
             data["node_to_node_adj_link"]=self.node_to_node_adj_link
@@ -351,8 +391,8 @@ class Mesh:
             self.element_data=data["element_data"]
         if "mesh_data" in data.keys():
             self.mesh_data=data["mesh_data"]
-        if "node_name_to_index" in data.keys():
-            self.node_name_to_index=data["node_name_to_index"]
+        if "mapping_from_node_name_to_index" in data.keys():
+            self.mapping_from_node_name_to_index=data["mapping_from_node_name_to_index"]
         if "edge" in data.keys():
             self.edge=data["edge"]
         if "node_to_node_adj_link" in data.keys():
@@ -443,7 +483,22 @@ class Mesh:
         elif object_type == 'torch':
             node=torch.tensor(node, dtype=dtype)
         return node
+    
+    def get_node_idx_by_name(self, name):
+        if name in self.mapping_from_node_name_to_index.keys():
+            return self.mapping_from_node_name_to_index[name]
+        else:
+            return None
 
+    def set_node_name(self, idx, name, replace_old_name=False):
+        if replace_old_name == True:
+            self.mapping_from_node_name_to_index[name]=idx
+        else:
+            if name in self.mapping_from_node_name_to_index.keys():
+                raise ValueError("node "+str(idx)+" already has a name:"+str(name))
+            else:
+                self.mapping_from_node_name_to_index[name]=idx
+    
     def build_edge(self):
         #undirected edge represents a connection between two nodes
         #self.edge[k] is [node_idx_a, node_idx_b] and node_idx_a < node_idx_b: self.edge[k,0] < self.edge[k,1]

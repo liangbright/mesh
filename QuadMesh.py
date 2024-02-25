@@ -109,7 +109,7 @@ class QuadMesh(PolygonMesh):
         return area, normal
 
     @staticmethod
-    def cal_element_corner_angle(node, element):
+    def cal_element_corner_angle(node, element, return_cos=False):
         x0=node[element[:,0]]
         x1=node[element[:,1]]
         x2=node[element[:,2]]
@@ -117,10 +117,10 @@ class QuadMesh(PolygonMesh):
         # x3--x2
         # |   |
         # x0--x1
-        angle0=pmp.ComputeAngleBetweenTwoVectorIn3D(x1-x0, x3-x0)
-        angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1)
-        angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x3-x2, x1-x2)
-        angle3=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x3, x2-x3)
+        angle0=pmp.ComputeAngleBetweenTwoVectorIn3D(x1-x0, x3-x0, return_cos)
+        angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1, return_cos)
+        angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x3-x2, x1-x2, return_cos)
+        angle3=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x3, x2-x3, return_cos)
         angle=torch.cat([angle0.view(-1,1), angle1.view(-1,1), angle2.view(-1,1), angle3.view(-1,1)], dim=1)
         return angle
 
@@ -181,11 +181,11 @@ class QuadMesh(PolygonMesh):
         mesh_new=QuadMesh(node_new, element_new)
         return mesh_new
 
-    def get_sub_mesh(self, element_id_list, return_node_idx_list=False):
-        element_sub=self.element[element_id_list]
+    def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
+        element_sub=self.element[element_idx_list]
         node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_new=self.node[node_idx_list]
-        element_new=element_out.view(-1,4)
+        element_new=element_out.view(len(element_idx_list),-1)
         mesh_new=QuadMesh(node_new, element_new)
         if return_node_idx_list == False:
             return mesh_new

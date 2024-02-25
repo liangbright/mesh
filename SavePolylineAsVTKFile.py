@@ -4,9 +4,29 @@ Created on Tue Nov  7 19:52:22 2023
 
 @author: liang
 """
+import numpy as np
 import torch
 
-def save_polyline_to_vtk(node, line, filename):
+def save_curve_as_vtk(curve_list, filename):
+    node, line=convert_curve_to_polyline(curve_list)
+    save_polyline_as_vtk(node, line, filename)
+
+def convert_curve_to_polyline(curve_list):
+    #curve_list is a list of curves, each cure is a numpy array
+    node=[]
+    line=[]
+    for k in range(0, len(curve_list)):
+        curve=curve_list[k]        
+        if isinstance(curve, torch.Tensor) or isinstance(curve, np.ndarray):
+            curve=curve.tolist()
+        if len(curve) > 0:
+            idx_start=len(node)
+            node.extend(curve)
+            line.append(np.arange(idx_start, idx_start+len(curve)).tolist())
+    node=torch.tensor(node, dtype=torch.float64)
+    return node, line
+    
+def save_polyline_as_vtk(node, line, filename):
     #node: (N, 3), 3D positions
     #line[k] is the k-th polyline, a list of node indexes
     try:

@@ -9,11 +9,7 @@ import torch_scatter
 from torch_sparse import SparseTensor
 import numpy as np
 import json
-from torch.linalg import det
-try:
-    from Element_C3D8 import cal_dh_dr, get_integration_point_1i, get_integration_point_8i, interpolate
-except:
-    print('can not import Element_C3D8 @ HexahedronMesh')
+from torch.linalg import det, cross
 from PolyhedronMesh import PolyhedronMesh
 #%%
 class HexahedronMesh(PolyhedronMesh):
@@ -23,98 +19,39 @@ class HexahedronMesh(PolyhedronMesh):
         self.mesh_type='polyhedron_hex8'
 
     def build_edge(self):
+        self.build_element_to_edge_adj_table()
+        
+    def build_element_to_edge_adj_table(self):
         element=self.element
         if isinstance(element, torch.Tensor):
             element=element.detach().cpu().numpy()
         edge=[]
         for m in range(0, len(element)):
-            id0=element[m][0]
-            id1=element[m][1]
-            id2=element[m][2]
-            id3=element[m][3]
-            id4=element[m][4]
-            id5=element[m][5]
-            id6=element[m][6]
-            id7=element[m][7]
-            if id0 < id1:
-                edge.append([id0, id1])
-            else:
-                edge.append([id1, id0])
-            if id1 < id2:
-                edge.append([id1, id2])
-            else:
-                edge.append([id2, id1])
-            if id2 < id3:
-                edge.append([id2, id3])
-            else:
-                edge.append([id3, id2])
-            if id3 < id0:
-                edge.append([id3, id0])
-            else:
-                edge.append([id0, id3])
-            if id4 < id5:
-                edge.append([id4, id5])
-            else:
-                edge.append([id5, id4])
-            if id5 < id6:
-                edge.append([id5, id6])
-            else:
-                edge.append([id6, id5])
-            if id6 < id7:
-                edge.append([id6, id7])
-            else:
-                edge.append([id7, id6])
-            if id7 < id4:
-                edge.append([id7, id4])
-            else:
-                edge.append([id4, id7])
-            if id0 < id4:
-                edge.append([id0, id4])
-            else:
-                edge.append([id4, id0])
-            if id1 < id5:
-                edge.append([id1, id5])
-            else:
-                edge.append([id5, id1])
-            if id2 < id6:
-                edge.append([id2, id6])
-            else:
-                edge.append([id6, id2])
-            if id3 < id7:
-                edge.append([id3, id7])
-            else:
-                edge.append([id7, id3])
-        edge=torch.tensor(edge, dtype=torch.int64)
-        edge=torch.unique(edge, dim=0, sorted=True)
-        self.edge=edge
-
-    def build_element_to_edge_adj_table(self):
-        element=self.element
-        if isinstance(element, torch.Tensor):
-            element=element.detach().cpu().numpy()
-        adj_table=[[] for _ in range(len(self.element))]
-        for m in range(0, len(element)):
-            id0=element[m][0]
-            id1=element[m][1]
-            id2=element[m][2]
-            id3=element[m][3]
-            id4=element[m][4]
-            id5=element[m][5]
-            id6=element[m][6]
-            id7=element[m][7]
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id0, id1))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id1, id2))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id2, id3))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id0, id3))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id4, id5))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id5, id6))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id6, id7))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id4, id7))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id0, id4))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id1, id5))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id2, id6))
-            adj_table[m].append(self.get_edge_idx_from_node_pair(id3, id7))
-        self.element_to_edge_adj_table=adj_table
+            id0=int(element[m][0])
+            id1=int(element[m][1])
+            id2=int(element[m][2])
+            id3=int(element[m][3])
+            id4=int(element[m][4])
+            id5=int(element[m][5])
+            id6=int(element[m][6])
+            id7=int(element[m][7])
+            edge.append([id0, id1])
+            edge.append([id1, id2])
+            edge.append([id2, id3])
+            edge.append([id3, id0])
+            edge.append([id4, id5])
+            edge.append([id5, id6])
+            edge.append([id6, id7])
+            edge.append([id7, id4])
+            edge.append([id0, id4])
+            edge.append([id1, id5])
+            edge.append([id2, id6])
+            edge.append([id3, id7])            
+        edge=np.array(edge, dtype=np.int64)
+        edge=np.sort(edge, axis=1)
+        edge_unique, inverse=np.unique(edge, return_inverse=True, axis=0)
+        self.edge=torch.tensor(edge_unique, dtype=torch.int64)
+        self.element_to_edge_adj_table=inverse.reshape(-1,12).tolist()
 
     def build_face(self):
         #self.face[k] is a quad: [node_idx0, node_idx1, node_idx2, node_idx3]
@@ -125,16 +62,15 @@ class HexahedronMesh(PolyhedronMesh):
         if isinstance(element, torch.Tensor):
             element=element.detach().cpu().numpy()
         face=[]
-        face_sorted=[]
         for m in range(0, len(element)):
-            id0=element[m][0]
-            id1=element[m][1]
-            id2=element[m][2]
-            id3=element[m][3]
-            id4=element[m][4]
-            id5=element[m][5]
-            id6=element[m][6]
-            id7=element[m][7]
+            id0=int(element[m][0])
+            id1=int(element[m][1])
+            id2=int(element[m][2])
+            id3=int(element[m][3])
+            id4=int(element[m][4])
+            id5=int(element[m][5])
+            id6=int(element[m][6])
+            id7=int(element[m][7])
             face.append([id0, id3, id2, id1])
             face.append([id4, id5, id6, id7])
             face.append([id0, id1, id5, id4])
@@ -142,45 +78,47 @@ class HexahedronMesh(PolyhedronMesh):
             face.append([id2, id3, id7, id6])
             face.append([id3, id0, id4, id7])
         face=np.array(face, dtype=np.int64)
-        face_sorted,_=np.sort(face, axis=1)
-        face_sorted_unique, index, inverse=np.unique(face_sorted, return_index=True, return_inverse=True, axis=0)
-        self.face=torch.tensor(face[index], dtype=torch.int64)
-        self.element_to_face_adj_table=torch.tensor(inverse.reshape(-1,6), dtype=torch.int64)
+        face=np.sort(face, axis=1)
+        face_unique, inverse=np.unique(face, return_inverse=True, axis=0)
+        self.face=torch.tensor(face_unique, dtype=torch.int64)
+        self.element_to_face_adj_table=inverse.reshape(-1,6).tolist()
 
-    def build_face_to_element_adj_table(self):
-        if self.element_to_face_adj_table is None:
-            self.build_element_to_face_adj_table()
-        adj_table=[[] for _ in range(len(self.face))]
-        for m in range(0, len(self.element)):
-            face_idx_list=self.element_to_face_adj_table[m]
-            for idx in face_idx_list:
-                adj_table[idx].append(m)
-        self.face_to_element_adj_table=adj_table
-
-    def find_surface_face(self):
-        if self.face_to_element_adj_table is None:
-            self.build_face_to_element_adj_table()
-        face_idx_list=[]
-        for k in range(0, len(self.face)):
-            adj_elm_idx=self.face_to_element_adj_table[k]
-            if len(adj_elm_idx) <= 1:
-                face_idx_list.append(k)
-        return face_idx_list
-
-    def find_surface_node(self):
-        face_idx_list=self.find_surface_face()
-        node_idx_list=[]
-        for idx in face_idx_list:
-            node_idx_list.extend(self.face[idx])
-        node_idx_list=np.unique(node_idx_list).tolist()
-        return node_idx_list
-
-    def cal_element_volumn(self):
-        X=self.node[self.element]#shape (M,8,3)
-        r1i=get_integration_point_1i(X.dtype, X.device)
-        dX_dr=cal_dh_dr(r1i, X)
-        volumn=8*det(dX_dr)
-        return volumn
+    def upate_element_volume(self):
+        self.element_volume=HexahedronMesh.cal_element_volume(self.node, self.element)
+    
+    @staticmethod
+    def cal_element_volumn(node, element):
+        #X=self.node[self.element]#shape (M,8,3)
+        #r1i=get_integration_point_1i(X.dtype, X.device)
+        #dX_dr=cal_dh_dr(r1i, X)
+        #volumn=8*det(dX_dr)
+        #---------no need for FEA element---
+        #divide a hex8 to 12 tet4, and cal_vol of each tet4
+        def cal_vol(node0, node1, node2, node3):
+            a=node1-node0; b=node2-node0; c=node3-node0
+            vol=(1/6)*(cross(a,b)*c).sum(dim=-1).abs() 
+            return vol                   
+        x0=node[element[:,0]]
+        x1=node[element[:,1]]
+        x2=node[element[:,2]]
+        x3=node[element[:,3]]
+        x4=node[element[:,4]]
+        x5=node[element[:,5]]
+        x6=node[element[:,6]]
+        x7=node[element[:,7]]
+        volume=(cal_vol(x1,x2,x3,x5)
+               +cal_vol(x1,x5,x2,x3)
+               +cal_vol(x4,x7,x5,x3)
+               +cal_vol(x3,x7,x4,x5)
+               +cal_vol(x0,x4,x5,x3)
+               +cal_vol(x0,x3,x4,x5)
+               +cal_vol(x2,x5,x6,x3)
+               +cal_vol(x2,x6,x3,x5)
+               +cal_vol(x5,x7,x6,x3)
+               +cal_vol(x3,x6,x7,x5)
+               +cal_vol(x0,x5,x1,x3)
+               +cal_vol(x0,x1,x3,x5))
+        return volume
 
     def subdivide(self):
         #draw a 3D figure and code this...
@@ -191,7 +129,7 @@ class HexahedronMesh(PolyhedronMesh):
         element_sub=self.element[element_idx_list]
         node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
         node_out=self.node[node_idx_list]
-        element_out=element_out.view(-1,8)
+        element_out=element_out.view(len(element_idx_list),-1)
         mesh_new=HexahedronMesh(node_out, element_out)
         if return_node_idx_list == False:
             return mesh_new

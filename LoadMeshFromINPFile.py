@@ -34,7 +34,18 @@ def read_abaqus_inp(filename, remove_unused_node):
     if remove_unused_node == True:
         node, node_id, element=clean_data_remove_unused_node(node, node_id, element)
     #-----------
-    return node, node_id, node_set, element, element_id, element_type, element_set
+    element_orientation=read_element_orientation(inp, element_id)
+    #-----------
+    output={"node":node,
+            "node_id":node_id,
+            "node_set":node_set,
+            "element":element,
+            "element_id":element_id,
+            "element_type":element_type,
+            "element_set":element_set,
+            "element_orientation":element_orientation
+            }
+    return output
 #%%
 def read_node(inp):
     node=[]
@@ -52,8 +63,10 @@ def read_node(inp):
         k=k+1
         if k >= len(inp):
             break
+        if "**" in inp[k]:
+            continue
         if "*" in inp[k]:
-            break
+            break        
         temp=inp[k].replace(" ", "")
         temp=temp.split(",")
         node_id.append(int(temp[0]))
@@ -76,6 +89,8 @@ def fix_inp_element(inp):
             break  
         end_index=len(inp)-1
         for k in range(start_index, len(inp)):
+            if "**" in inp[k]:
+                continue
             if "*" in inp[k]:
                 end_index=k
                 break
@@ -133,8 +148,10 @@ def read_element(inp):
             k=k+1
             if k >= len(inp):
                 break
+            if "**" in inp[k]:
+                continue
             if "*" in inp[k]:
-                break
+                break            
             temp=inp[k].replace(" ", "")
             temp=temp.split(",")
             temp=[int(a) for a in temp]
@@ -176,8 +193,10 @@ def read_elset(inp):
             k=k+1
             if k >= len(inp):
                 break
+            if "**" in inp[k]:
+                continue
             if "*" in inp[k]:
-                break
+                break            
             temp=inp[k].replace(" ", "")
             temp=temp.split(",")
             temp=[int(a) for a in temp]
@@ -216,8 +235,10 @@ def read_nset(inp):
             k=k+1
             if k >= len(inp):
                 break
+            if "**" in inp[k]:
+                continue
             if "*" in inp[k]:
-                break
+                break            
             temp=inp[k].replace(" ", "")
             temp=temp.split(",")
             temp=[int(a) for a in temp]
@@ -273,3 +294,49 @@ def clean_data_remove_unused_node(node, node_id, element):
     node=node[used_old_idx_list]
     node_id=node_id[used_old_idx_list]
     return node, node_id, element
+#%%
+def read_element_orientation(inp, element_id):    
+    line_index=None
+    for k in range(0, len(inp)):
+        temp=inp[k].lower()
+        if ("*distribution" in temp) and ("ori" in temp) and ("element" in temp):
+            line_index=k
+            break
+    if line_index is None:
+        print('element orientation is not found')
+        return None
+    #--------------------------    
+    element_id=np.array(element_id, dtype=np.int64)
+    element_orientation=np.zeros((len(element_id),3,3))    
+    k=line_index
+    while True:
+        k=k+1
+        if k > len(inp)-1:
+            break
+        if "*" in inp[k]:
+            break
+        if "**" in inp[k]:
+            continue
+        line=inp[k].split(",")
+        #print(line)
+        elm_idx=int(line[0])
+        index=np.where(element_id==elm_idx)[0]
+        if len(index) == 0:
+            print("elm_idx", elm_idx, "is missing orientation")
+        else:
+            index=index.item()
+            d0=np.array([float(line[1]), float(line[2]), float(line[3])])            
+            d1=np.array([float(line[4]), float(line[5]), float(line[6])])            
+            d2=np.cross(d0, d1)            
+            #update d1
+            d1=np.cross(d2, d0)
+            d0=d0/np.linalg.norm(d0, ord=2)
+            d1=d1/np.linalg.norm(d1, ord=2)
+            d2=d2/np.linalg.norm(d2, ord=2)            
+            element_orientation[index,:,0]=d0
+            element_orientation[index,:,1]=d1
+            element_orientation[index,:,2]=d2
+    return element_orientation          
+    
+    
+    

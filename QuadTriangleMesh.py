@@ -138,7 +138,7 @@ class QuadTriangleMesh(PolygonMesh):
     @staticmethod
     def cal_element_corner_angle(node, element):
         temp=QuadTriangleMesh(node, element)
-        temp.update_element_area_and_normal()
+        temp.update_element_corner_angle()
         return temp.quad_element_corner_angle, temp.tri_element_corner_angle
         
     def subdivide(self):

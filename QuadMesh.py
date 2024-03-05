@@ -5,6 +5,8 @@ Created on Sat Mar 27 22:24:13 2021
 @author: liang
 """
 import torch
+from torch.linalg import vector_norm as norm
+from torch.linalg import cross
 import torch_scatter
 from PolygonMesh import PolygonMesh
 import PolygonMeshProcessing as pmp
@@ -19,6 +21,10 @@ class QuadMesh(PolygonMesh):
         self.element_area=None
         self.element_normal=None
         self.element_corner_angle=None
+        self.element_flatness=None
+        if (node is not None) and (element is not None):
+            if not self.is_quad():
+                raise ValueError('not a quad mesh')
 
     def update_node_normal(self, angle_weighted=True):
         self.node_normal=QuadMesh.cal_node_normal(self.node, self.element, angle_weighted=angle_weighted)
@@ -36,26 +42,26 @@ class QuadMesh(PolygonMesh):
         # |   |
         # x0--x1
         #normal could be nan if xa==xb (e.g., x0 == x1)
-        normal0=torch.cross(x1-x0, x3-x0, dim=-1)
-        normal0_norm=torch.norm(normal0, p=2, dim=1, keepdim=True)
+        normal0=cross(x1-x0, x3-x0, dim=-1)
+        normal0_norm=norm(normal0, ord=2, dim=-1, keepdim=True)
         with torch.no_grad():
             normal0_norm.data.clamp_(min=1e-12)            
         normal0=normal0/normal0_norm
         
-        normal1=torch.cross(x2-x1, x0-x1, dim=-1)
-        normal1_norm=torch.norm(normal1, p=2, dim=1, keepdim=True)
+        normal1=cross(x2-x1, x0-x1, dim=-1)
+        normal1_norm=norm(normal1, ord=2, dim=-1, keepdim=True)
         with torch.no_grad():
             normal1_norm.data.clamp_(min=1e-12) 
         normal1=normal1/normal1_norm
         
-        normal2=torch.cross(x3-x2, x1-x2, dim=-1)
-        normal2_norm=torch.norm(normal2, p=2, dim=1, keepdim=True)
+        normal2=cross(x3-x2, x1-x2, dim=-1)
+        normal2_norm=norm(normal2, ord=2, dim=-1, keepdim=True)
         with torch.no_grad():
             normal2_norm.data.clamp_(min=1e-12) 
         normal2=normal2/normal2_norm
 
-        normal3=torch.cross(x0-x3, x2-x3, dim=-1)
-        normal3_norm=torch.norm(normal3, p=2, dim=1, keepdim=True)
+        normal3=cross(x0-x3, x2-x3, dim=-1)
+        normal3_norm=norm(normal3, ord=2, dim=-1, keepdim=True)
         with torch.no_grad():
             normal3_norm.data.clamp_(min=1e-12) 
         normal3=normal3/normal3_norm
@@ -74,7 +80,7 @@ class QuadMesh(PolygonMesh):
         error=torch.isnan(normal).sum()
         if error > 0:
             print("error: nan in normal_quad @ QuadMesh:cal_node_normal")
-        normal_norm=torch.norm(normal, p=2, dim=1, keepdim=True)
+        normal_norm=norm(normal, ord=2, dim=-1, keepdim=True)
         with torch.no_grad():
             normal_norm.data.clamp_(min=1e-12)
         normal=normal/normal_norm
@@ -83,9 +89,6 @@ class QuadMesh(PolygonMesh):
 
     def update_element_area_and_normal(self):
          self.element_area, self.element_normal=QuadMesh.cal_element_area_and_normal(self.node, self.element)
-
-    def update_element_corner_angle(self):
-        self.element_corner_angle = QuadMesh.cal_element_corner_angle(self.node, self.element)
 
     @staticmethod
     def cal_element_area_and_normal(node, element):
@@ -100,13 +103,16 @@ class QuadMesh(PolygonMesh):
         # x0--x1
         dxdu=(1/4)*((x1+x2)-(x0+x3))
         dxdv=(1/4)*((x2+x3)-(x0+x1))
-        cross_uv=torch.cross(dxdu, dxdv, dim=-1)
-        temp=torch.norm(cross_uv, p=2, dim=1, keepdim=True)
+        cross_uv=cross(dxdu, dxdv, dim=-1)
+        temp=norm(cross_uv, ord=2, dim=-1, keepdim=True)
         area=4*temp.abs()
         with torch.no_grad():
             temp.data.clamp_(min=1e-12)
         normal=cross_uv/temp
         return area, normal
+
+    def update_element_corner_angle(self):
+        self.element_corner_angle = QuadMesh.cal_element_corner_angle(self.node, self.element)
 
     @staticmethod
     def cal_element_corner_angle(node, element, return_cos=False):
@@ -123,6 +129,47 @@ class QuadMesh(PolygonMesh):
         angle3=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x3, x2-x3, return_cos)
         angle=torch.cat([angle0.view(-1,1), angle1.view(-1,1), angle2.view(-1,1), angle3.view(-1,1)], dim=1)
         return angle
+    
+    def upate_element_flatness(self):
+        self.element_flatness=QuadMesh.cal_element_flatness(self.node, self.element)
+
+    @staticmethod
+    def cal_element_flatness(node, element):
+        # -1 (fold) <= flatness <= 1 (flat)
+        x0=node[element[:,0]]
+        x1=node[element[:,1]]
+        x2=node[element[:,2]]
+        x3=node[element[:,3]]
+        # x3--x2
+        # |   |
+        # x0--x1
+        #-------------------------
+        d023=cross(x2-x0, x3-x0, dim=-1)
+        d023_norm=norm(d023, ord=2, dim=-1, keepdim=True)
+        with torch.no_grad():
+            d023_norm.data.clamp_(min=1e-12)
+        d023=d023/d023_norm
+        #-------------------------
+        d012=cross(x1-x0, x2-x0, dim=-1)
+        d012_norm=norm(d012, ord=2, dim=-1, keepdim=True)
+        with torch.no_grad():
+            d012_norm.data.clamp_(min=1e-12)
+        d012=d012/d012_norm
+        #-------------------------
+        d123=cross(x2-x1, x3-x1, dim=-1)
+        d123_norm=norm(d123, ord=2, dim=-1, keepdim=True)
+        with torch.no_grad():
+            d123_norm.data.clamp_(min=1e-12)
+        d123=d123/d123_norm
+        #-------------------------
+        d130=cross(x3-x1, x0-x1, dim=-1)
+        d130_norm=norm(d130, ord=2, dim=-1, keepdim=True)
+        with torch.no_grad():
+            d130_norm.data.clamp_(min=1e-12)
+        d130=d130/d130_norm
+        #-------------------------
+        flatness=0.5*((d023*d012).sum(dim=-1)+(d123*d130).sum(dim=-1))
+        return flatness
 
     def sample_points_on_elements(self, n_points):
          return QuadMesh.sample_points(self.node, self.element, n_points)
@@ -142,7 +189,7 @@ class QuadMesh(PolygonMesh):
         x=a[2]*(a[0]*x0+(1-a[0])*x1)+(1-a[2])*(a[1]*x2+(1-a[1])*x3)
         return x
 
-    def subdivide(self):
+    def subdivide_to_quad(self):
         #return a new mesh        
         #add a node in the middle of each edge
         if self.edge is None:
@@ -177,7 +224,6 @@ class QuadMesh(PolygonMesh):
             element_new.append([id4, id1, id5, id8])
             element_new.append([id7, id8, id6, id3])
             element_new.append([id8, id5, id2, id6])
-        element_new=torch.tensor(element_new, dtype=torch.int64, device=self.element.device)
         mesh_new=QuadMesh(node_new, element_new)
         return mesh_new
 
@@ -193,6 +239,16 @@ class QuadMesh(PolygonMesh):
             return mesh_new, node_idx_list
 #%%
 if __name__ == "__main__":
+    #%%
+    node=torch.tensor([[0, 0, 0],
+                       [1, 0, 0],
+                       [1, 1, 0],
+                       [0, 1, 0]], dtype=torch.float32)
+    element=[[0,1,2,3]]
+    simple=QuadMesh(node, element)
+    simple.update_element_area_and_normal()
+    print(simple.element_area)
+    #%%
     filename="F:/MLFEA/TAA/data/343c1.5/bav17_AortaModel_P0_best.vtk"
     wall=QuadMesh()
     wall.load_from_vtk(filename, 'float64')

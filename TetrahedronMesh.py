@@ -22,14 +22,11 @@ class TetrahedronMesh(PolyhedronMesh):
         
     def build_element_to_edge_adj_table(self):
         element=self.element
-        if isinstance(element, torch.Tensor):
-            element=element.detach().cpu().numpy()
+        if not isinstance(element, list):
+            element=element.tolist()
         edge=[]
         for m in range(0, len(element)):
-            id0=int(element[m][0])
-            id1=int(element[m][1])
-            id2=int(element[m][2])
-            id3=int(element[m][3])
+            id0, id1, id2, id3=element[m]
             edge.append([id0, id1])
             edge.append([id0, id2])
             edge.append([id0, id3])
@@ -41,29 +38,26 @@ class TetrahedronMesh(PolyhedronMesh):
         edge_unique, inverse=np.unique(edge, return_inverse=True, axis=0)
         self.edge=torch.tensor(edge_unique, dtype=torch.int64)
         self.element_to_edge_adj_table=inverse.reshape(-1,6).tolist()
-
+    
     def build_face(self):
         #self.face[k] is a triangle: [node_idx0, node_idx1, node_idx2]
         self.build_element_to_face_adj_table()
 
     def build_element_to_face_adj_table(self):
         element=self.element
-        if isinstance(element, torch.Tensor):
-            element=element.detach().cpu().numpy()
+        if not isinstance(element, list):
+            element=element.tolist()
         face=[]
         for m in range(0, len(element)):
-            id0=int(element[m][0])
-            id1=int(element[m][1])
-            id2=int(element[m][2])
-            id3=int(element[m][3])
+            id0, id1, id2, id3=element[m]
             face.append([id0, id2, id1])
             face.append([id0, id1, id3])
             face.append([id0, id3, id2])
             face.append([id1, id2, id3])
         face=np.array(face, dtype=np.int64)
-        face=np.sort(face, axis=1)
-        face_unique, inverse=np.unique(face, return_inverse=True, axis=0)
-        self.face=torch.tensor(face_unique, dtype=torch.int64)
+        face_sorted=np.sort(face, axis=1)
+        face_sorted_unique, index, inverse=np.unique(face_sorted, return_index=True, return_inverse=True, axis=0)
+        self.face=torch.tensor(face[index], dtype=torch.int64)
         self.element_to_face_adj_table=inverse.reshape(-1,4).tolist()
 
     def upate_element_volume(self):

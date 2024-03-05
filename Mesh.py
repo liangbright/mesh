@@ -118,7 +118,7 @@ class Mesh:
         reader.SetFileName(filename)
         reader.Update()
         mesh_vtk = reader.GetOutput()
-        self.read_mesh_vtk(mesh_vtk, dtype, filename)
+        self.read_mesh_vtk(mesh_vtk, dtype)
     
     def load_from_vtp(self, filename, dtype):
         if _Flag_VTK_IMPORT_ == False:
@@ -503,42 +503,8 @@ class Mesh:
         #undirected edge represents a connection between two nodes
         #self.edge[k] is [node_idx_a, node_idx_b] and node_idx_a < node_idx_b: self.edge[k,0] < self.edge[k,1]
         #edge is determined by element_type
-        #it is efficient to implement this function in a derived class (e.g. PolygonMesh)
+        #implement this function in a derived class (e.g. PolygonMesh)
         raise NotImplementedError
-
-    def build_map_node_pair_to_edge(self):
-        if self.edge is None:
-            self.build_edge()
-        if self.map_node_pair_to_edge is not None:
-            return
-        row=[]
-        col=[]
-        value=[]
-        for k in range(0, len(self.edge)):
-            # self.edge[k,0] < self.edge[k,1]
-            row.append(int(self.edge[k,0]))
-            col.append(int(self.edge[k,1]))
-            value.append(k+1)
-        row=torch.tensor(row, dtype=torch.int64, device=self.node.device)
-        col=torch.tensor(col, dtype=torch.int64, device=self.node.device)
-        value=torch.tensor(value, dtype=torch.int64, device=self.node.device)
-        self.map_node_pair_to_edge=SparseTensor(row=row, col=col, value=value,
-                                                sparse_sizes=(self.node.shape[0], self.node.shape[0]))
-
-    def get_edge_idx_from_node_pair_slow(self, nodeA_idx, nodeB_idx):
-        # nodeA---an edge---nodeB
-        if self.map_node_pair_to_edge is None:
-            self.build_map_node_pair_to_edge()
-        if nodeA_idx == nodeB_idx:
-            return None
-        elif nodeA_idx < nodeB_idx:
-            edge_idx = self.map_node_pair_to_edge[nodeA_idx, nodeB_idx].to_dense().item()
-        else:
-            edge_idx = self.map_node_pair_to_edge[nodeB_idx, nodeA_idx].to_dense().item()
-        if edge_idx == 0:
-            return None
-        edge_idx=edge_idx-1
-        return edge_idx
 
     def get_edge_idx_from_node_pair(self, nodeA_idx, nodeB_idx):
         # nodeA---an edge---nodeB

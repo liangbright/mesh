@@ -5,7 +5,7 @@ Created on Fri Nov  3 00:12:58 2023
 @author: liang
 """
 import torch
-from torch.linalg import norm
+from torch.linalg import vector_norm as norm
 import torch_scatter
 import numpy as np
 from Mesh import Mesh

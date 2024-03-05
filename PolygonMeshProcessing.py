@@ -20,44 +20,65 @@ try:
 except:
     print("cannot import vtk")
 #%%
-def TracePolygonMeshBoundaryCurve(mesh, node_idx, next_node_idx=None):
-    #trace boundary starting from node_ix -> next_node_idx -> ...
+def TracePolygonMeshBoundaryCurve(mesh, start_node_idx, next_node_idx=None):
+    #trace boundary starting from start_node_idx -> next_node_idx -> ...
     #this function may not work well if two boundary curves share points
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     #---------
-    boundary=mesh.find_boundary_node()
-    boundary=list(boundary)
+    if mesh.node_to_edge_adj_table is None:
+        mesh.build_node_to_edge_adj_table()
+    #---------
+    boundary_node, boundary_edge=mesh.find_boundary_node_and_edge()
     BoundaryCurve=[]
-    if node_idx not in boundary:
+    if start_node_idx not in boundary_node:
         return BoundaryCurve
     if next_node_idx is not None:
-        if next_node_idx not in boundary:
+        edge_idx=mesh.get_edge_idx_from_node_pair(start_node_idx, next_node_idx) 
+        if edge_idx not in boundary_edge:
             return BoundaryCurve
-        BoundaryCurve.append(node_idx)
-        node_idx=next_node_idx
+        else:
+            BoundaryCurve.append(start_node_idx)
+            start_node_idx=next_node_idx
     #---------
-    if mesh.node_to_node_adj_table is None:
-        mesh.build_node_to_node_adj_table()
-    node_adj_table=mesh.node_to_node_adj_table
-    idx_next=node_idx
+    idx_next=start_node_idx
     while True:
         BoundaryCurve.append(idx_next)
-        idx_list_next=node_adj_table[idx_next]
+        edge_idx_list=mesh.node_to_edge_adj_table[idx_next]
         flag=False
-        for k in range(0, len(idx_list_next)):
-            idx_next=idx_list_next[k]
-            if (idx_next in boundary) and (idx_next not in BoundaryCurve):
-                flag=True
-                break
+        for edge_idx in edge_idx_list:
+            if edge_idx in boundary_edge:
+                idx_list=mesh.edge[edge_idx].tolist()
+                if idx_next == idx_list[0]:
+                    node_idx=idx_list[1]
+                elif idx_next == idx_list[1]:
+                    node_idx=idx_list[0]
+                else:
+                    raise ValueError('something is wrong in edge and node_to_edge_adj_table')
+                if node_idx not in BoundaryCurve:
+                    idx_next=node_idx
+                    flag=True
+                    break
         if flag == False:
             break
     return BoundaryCurve
 #%%
-def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx):
+def FindPolygonMeshBoundaryCurve(mesh):
+    node_idx_list=mesh.find_boundary_node()
+    BoundaryCurveList=[]
+    while True:
+        if len(node_idx_list) == 0:
+            break
+        BoundaryCurve=TracePolygonMeshBoundaryCurve(mesh, node_idx_list[0])
+        BoundaryCurveList.append(BoundaryCurve)
+        node_idx_list=list(set(node_idx_list)-set(BoundaryCurve))
+    return BoundaryCurveList
+#%%
+def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx, max_n_elements=float('inf')):
     #node_curve_list[k] is a curve - represented by a list/array of node indexes on mesh
     #the combined curve (from curve_list[0] to curve_list[-1]) is closed
     #inner_element_idx is the index of an element inside the region
+    #max_n_elements: maximum number of elements in the region
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     #-------------------------
@@ -120,6 +141,9 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx):
         counter+=1
         #if counter ==100:
         #    break
+        if len(region_element_list) > max_n_elements:
+            print('break: len(region_element_list) > max_n_elements @ExtractRegionEnclosedByCurve')
+            break
     #--------------
     return region_element_list
 #%%
@@ -191,7 +215,8 @@ def ProjectPointToSurface(mesh, point, mesh_vtk=None):
     #ProjectPointToFaceByVTKCellLocator in MDK
     #point (N, 3)
     if not isinstance(mesh, PolygonMesh):
-        raise NotImplementedError
+        #raise NotImplementedError
+        pass
     if mesh.is_tri() == False:
         raise NotImplementedError
     if mesh_vtk is None:
@@ -210,15 +235,16 @@ def ProjectPointToSurface(mesh, point, mesh_vtk=None):
         CellLocator.FindClosestPoint(testPoint, closestPoint, cellId, subId, closestPointDist2);
         point_proj.append(closestPoint)
         face_proj.append(int(cellId))
+    point_proj=torch.tensor(point_proj, dtype=mesh.node.dtype)
     return point_proj, face_proj
 #%%
 def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters):
     #smooth mesh_move and project it to mesh_fixed
+    #mesh_fixed must be a triangle mesh
     mesh_fixed_vtk=mesh_fixed.convert_to_vtk()
     for k in range(0, n2_iters):
         SimpleSmootherForMesh(mesh_move, lamda, mask, n1_iters)
-        node_proj, face_proj=ProjectPointToSurface(mesh_fixed, mesh_move.node, mesh_fixed_vtk)
-        node_proj=torch.tensor(node_proj, dtype=mesh_move.node.dtype)
+        node_proj, face_proj=ProjectPointToSurface(mesh_fixed, mesh_move.node, mesh_fixed_vtk)        
         temp=mask.view(-1)
         mesh_move.node[temp>0]=node_proj[temp>0]
 

@@ -12,8 +12,8 @@ import json
 #%%
 class PolygonMesh(Mesh):
     def __init__(self, node=None, element=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype, element_type=None, mesh_type='polygon')
-
+        super().__init__(node=node, element=element, dtype=dtype, element_type=None, mesh_type='polygon')        
+        
     def save_as_mdk_json(self, filename):
         #to be compatible with MDK SavePolygonMeshFromJsonDataFile
         #use json to store node_set, element_set, etc
@@ -59,8 +59,8 @@ class PolygonMesh(Mesh):
         
     def build_element_to_edge_adj_table(self):
         element=self.element
-        if isinstance(element, torch.Tensor):
-            element=element.detach().cpu().numpy()
+        if not isinstance(element, list):
+            element=element.tolist()
         edge=[]
         for m in range(0, len(element)):
             elm=element[m]
@@ -76,10 +76,10 @@ class PolygonMesh(Mesh):
         edge=np.array(edge, dtype=np.int64)
         edge_unique, inverse=np.unique(edge, return_inverse=True, axis=0)
         self.edge=torch.tensor(edge_unique, dtype=torch.int64)
-        adj_table=[[] for _ in range(len(self.element))]
+        adj_table=[]
         idx=0
         for m in range(0, len(element)):
-            adj_table.append(inverse[idx:(idx+len(element[m]))])
+            adj_table.append(inverse[idx:(idx+len(element[m]))].tolist())
             idx=idx+len(element[m])        
         self.element_to_edge_adj_table=adj_table
 
@@ -98,6 +98,36 @@ class PolygonMesh(Mesh):
                 boundary.append(edge[k,1])
         boundary=np.unique(boundary).tolist()
         return boundary
+    
+    def find_boundary_edge(self):
+        if self.edge is None:
+            self.build_edge()
+        if self.edge_to_element_adj_table is None:
+            self.build_edge_to_element_adj_table()
+        edge=self.edge.detach().cpu().numpy()
+        boundary=[]
+        for k in range(0, len(edge)):
+            adj_elm_idx=self.edge_to_element_adj_table[k]
+            if len(adj_elm_idx) == 1:
+                boundary.append(k)
+        return boundary
+    
+    def find_boundary_node_and_edge(self):
+        if self.edge is None:
+            self.build_edge()
+        if self.edge_to_element_adj_table is None:
+            self.build_edge_to_element_adj_table()
+        edge=self.edge.detach().cpu().numpy()
+        boundary_node=[]
+        boundary_edge=[]
+        for k in range(0, len(edge)):
+            adj_elm_idx=self.edge_to_element_adj_table[k]
+            if len(adj_elm_idx) == 1:
+                boundary_node.append(edge[k,0])
+                boundary_node.append(edge[k,1])
+                boundary_edge.append(k)
+        boundary_node=np.unique(boundary_node).tolist()
+        return boundary_node, boundary_edge
     
     def find_boundary_element(self, adj):
         #return index list of elements on boundary
@@ -178,15 +208,13 @@ class PolygonMesh(Mesh):
             return False
 
     def quad_to_tri(self, mode=0):
-        #inplace function to divide every quad element to two triangle elements
-        #self.clear_adj_info() is called inside this function
+        #divide every quad element to two triangle elements        
         if isinstance(self.element, torch.Tensor):
-            if len(self.element[0]) == 3:
-                #this is TriangleMesh
-                return
+            if len(self.element[0]) == 3:                
+                new_mesh=PolygonMesh(self.node.clone(), self.element.clone())
+                return new_mesh
         element_new=[]
         m_list=[]
-        flag=False
         for m in range(0, len(self.element)):
             elm=self.copy_to_list(self.element[m])
             if len(elm) == 4:
@@ -220,7 +248,6 @@ class PolygonMesh(Mesh):
                 else:
                     raise ValueError("mode is invalid")
                 m_list.append(3)
-                flag=True
             elif len(elm) == 3:
                 id0=int(elm[0])
                 id1=int(elm[1])
@@ -229,15 +256,9 @@ class PolygonMesh(Mesh):
                 m_list.append(3)
             else:
                 element_new.append(elm)
-                m_list.append(len(elm))
-        if flag == True: # at lest one quad is divided
-            if min(m_list) == max(m_list):
-                if isinstance(self.element, torch.Tensor):
-                    element_new=torch.tensor(element_new, dtype=torch.int64, device=self.element.device)
-                else:
-                    element_new=torch.tensor(element_new, dtype=torch.int64)
-            self.element=element_new
-            self.clear_adj_info()
+                m_list.append(len(elm))        
+        new_mesh=PolygonMesh(self.node.clone(), element_new)        
+        return new_mesh
 
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
         new_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)

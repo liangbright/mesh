@@ -8,6 +8,8 @@ import numpy as np
 import torch
 
 def save_curve_as_vtk(curve_list, filename):
+    if not isinstance(curve_list, list):
+        raise ValueError('input curve_list must be a list')
     node, line=convert_curve_to_polyline(curve_list)
     save_polyline_as_vtk(node, line, filename)
 

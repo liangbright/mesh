@@ -89,6 +89,7 @@ class Mesh:
         self.node_to_node_adj_table=None
         self.node_to_edge_adj_table=None
         self.node_to_element_adj_table=None
+        self.edge_to_edge_adj_table=None
         self.edge_to_element_adj_table=None# an edge of an element
         self.element_to_edge_adj_table=None# an edge of an element
         if 'polygon' in self.mesh_type:
@@ -235,7 +236,7 @@ class Mesh:
         return cell_type
 
     @staticmethod
-    def translate_element_type_to_vtk_cell_type(element_type):
+    def get_vtk_cell_type_from_element_type(element_type):
         #element_type: tri3, quad4, hex8, etc
         raise NotImplementedError
 
@@ -359,7 +360,8 @@ class Mesh:
             data["node_to_node_adj_table"]=self.node_to_node_adj_table
             data["node_to_edge_adj_table"]=self.node_to_edge_adj_table
             data["node_to_element_adj_table"]=self.node_to_element_adj_table
-            data["edge_to_element_adj_table"]=self.edge_to_element_adj_table
+            data["edge_to_edge_adj_table"]=self.edge_to_edge_adj_table
+            data["edge_to_element_adj_table"]=self.edge_to_element_adj_table            
             data["element_to_element_adj_link"]=self.element_to_element_adj_link
             data["element_to_element_adj_table"]=self.element_to_element_adj_table
             data["element_to_edge_adj_table"]=self.element_to_edge_adj_table
@@ -403,6 +405,8 @@ class Mesh:
             self.node_to_edge_adj_table=data["node_to_edge_adj_table"]
         if "node_to_element_adj_table" in data.keys():
             self.node_to_element_adj_table=data["node_to_element_adj_table"]
+        if "edge_to_edge_adj_table" in data.keys():
+            self.edge_to_edge_adj_table=data["edge_to_edge_adj_table"]
         if "edge_to_element_adj_table" in data.keys():
             self.edge_to_element_adj_table=data["edge_to_element_adj_table"]
         if "element_to_element_adj_link" in data.keys():
@@ -464,23 +468,29 @@ class Mesh:
             raise ValueError('unsupported python-object type')
         return y
 
-    def copy_element(self, object_type):
+    def make_element_copy(self, object_type=None):
         element=self.copy_to_list(self.element)
-        if object_type == 'list':
+        if object_type is None:
+            object_type=type(self.element)
+        if object_type == 'list' or object_type == list:
             pass
-        elif object_type == 'numpy':
+        elif object_type == 'numpy' or object_type == np.ndarray:
             element=np.array(element, dtype=np.int64)
-        elif object_type == 'torch':
+        elif object_type == 'torch' or object_type == torch.Tensor:
             element=torch.tensor(element, dtype=torch.int64)
         return element
 
-    def copy_node(self, object_type, dtype="float32"):
+    def make_node_copy(self, object_type=None, dtype=None):
         node=self.copy_to_list(self.node)
-        if object_type == 'list':
+        if object_type is None:
+            object_type=type(self.node)
+        if dtype is None:
+            dtype=self.node.dtype
+        if object_type == 'list' or object_type == list:
             pass
-        elif object_type == 'numpy':
+        elif object_type == 'numpy' or object_type == np.ndarray:
             node=np.array(node, dtype=dtype)
-        elif object_type == 'torch':
+        elif object_type == 'torch' or object_type == torch.Tensor:
             node=torch.tensor(node, dtype=dtype)
         return node
     
@@ -569,8 +579,10 @@ class Mesh:
             self.build_edge()
         adj_table=[[] for _ in range(self.node.shape[0])]
         for k in range(0, len(self.edge)):
-            adj_table[self.edge[k,0]].append(k)
-            adj_table[self.edge[k,1]].append(k)
+            idx0=int(self.edge[k,0])
+            idx1=int(self.edge[k,1])
+            adj_table[idx0].append(k)
+            adj_table[idx1].append(k)
         self.node_to_edge_adj_table=adj_table
 
     def build_node_to_element_adj_table(self):
@@ -587,6 +599,18 @@ class Mesh:
                 adj_table[e_m[k]].append(m)
         self.node_to_element_adj_table=adj_table
 
+    def build_edge_to_edge_adj_table(self):
+        if self.node_to_edge_adj_table is None:
+            self.build_node_to_edge_adj_table()
+        adj_table=[[] for _ in range(self.edge.shape[0])]
+        for k in range(0, len(self.edge)):
+            idx0=int(self.edge[k,0])
+            idx1=int(self.edge[k,1])
+            adj_table[k].extend(self.node_to_edge_adj_table[idx0])
+            adj_table[k].extend(self.node_to_edge_adj_table[idx1])
+            adj_table[k]=list(set(adj_table[k])-set([k]))
+        self.edge_to_edge_adj_table=adj_table
+        
     def build_edge_to_element_adj_table(self):
         if self.element_to_edge_adj_table is None:
             self.build_element_to_edge_adj_table()
@@ -596,6 +620,11 @@ class Mesh:
             for edge_idx in adj_edge_idx_list:
                 adj_table[edge_idx].append(m)
         self.edge_to_element_adj_table=adj_table
+
+    def build_element_to_edge_adj_table(self):
+        #this table is determined by element_type
+        #implement this function in a derived class (e.g., PolygonMesh)
+        raise NotImplementedError
 
     def build_element_to_element_adj_link_node(self):
         if self.node_to_element_adj_table is None:
@@ -668,11 +697,6 @@ class Mesh:
             if idx0 != idx1:
                 adj_table[idx0].append(idx1)
         self.element_to_element_adj_table[adj]=adj_table
-
-    def build_element_to_edge_adj_table(self):
-        #this table is determined by element_type
-        #implement this function in a derived class (e.g., PolygonMesh)
-        raise NotImplementedError
 
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
         #this function is slow: ony use it if the mesh has different types of elements

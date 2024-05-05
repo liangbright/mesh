@@ -275,7 +275,7 @@ def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
             node_idx_listB_keep.append(n)
 
     nodeAB=torch.cat([meshA.node, meshB.node[node_idx_listB_keep]], dim=0)
-    elementAB=meshA.copy_element('list') + meshB.copy_element('list')
+    elementAB=meshA.make_element_copy('list') + meshB.make_element_copy('list')
     for m in range(len(meshA.element), len(elementAB)):
         elm=elementAB[m]
         for k in range(0, len(elm)):
@@ -310,7 +310,7 @@ def RemoveUnusedNode(mesh, return_node_idx_list=False, clear_adj_info=True):
     if return_node_idx_list == True:
         return node_idx_list
 #%%
-def FindNearestNode(mesh, point):
+def FindNearestNode(mesh, point, distance_threshold=np.inf):
     #point (K, 3) or (3,)
     if not isinstance(point, (torch.Tensor, np.ndarray)):
         raise ValueError("unsupported type "+str(type(point)))
@@ -323,7 +323,8 @@ def FindNearestNode(mesh, point):
         p=point[n].view(1,-1)
         d=((mesh.node-p)**2).sum(dim=-1)
         idx=d.argmin()
-        node_idx_list.append(int(idx))    
+        if float(d[idx]) <= distance_threshold:
+            node_idx_list.append(int(idx))    
     if flag == False:
         return node_idx_list
     else:

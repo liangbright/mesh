@@ -14,10 +14,6 @@ from Tet10Mesh import Tet10Mesh
 from copy import deepcopy
 from MeshProcessing import SimpleSmoother, SimpleSmootherForMesh, ComputeAngleBetweenTwoVectorIn3D, TracePolyline, \
                             IsCurveClosed, MergeMesh, FindConnectedRegion, FindNearestNode
-try:
-    import vtk
-except:
-    print("cannot import vtk")
 #%%
 def ExtractSurface(mesh):
     #extract surface and make sure surface normal is from inside to outside

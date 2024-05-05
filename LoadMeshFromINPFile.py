@@ -300,6 +300,7 @@ def read_element_orientation(inp, element_id):
     for k in range(0, len(inp)):
         temp=inp[k].lower()
         if ("*distribution" in temp) and ("ori" in temp) and ("element" in temp):
+            #*Distribution, name=Ori-1-DiscOrient, location=ELEMENT, Table=Ori-1-DiscOrient_Table
             line_index=k
             break
     if line_index is None:
@@ -312,17 +313,20 @@ def read_element_orientation(inp, element_id):
     while True:
         k=k+1
         if k > len(inp)-1:
-            break
+            break        
+        if "**" in inp[k]:
+            #** Description: Distribution generated from Discrete Orientation
+            continue
         if "*" in inp[k]:
             break
-        if "**" in inp[k]:
-            continue
         line=inp[k].split(",")
-        #print(line)
-        elm_idx=int(line[0])
-        index=np.where(element_id==elm_idx)[0]
+        if line[0]=='':
+            #,  1., 0., 0., 0., 1., 0.
+            continue
+        elm_id=int(line[0])
+        index=np.where(element_id==elm_id)[0]
         if len(index) == 0:
-            print("elm_idx", elm_idx, "is missing orientation")
+            print("elm_id", elm_id, "is missing orientation")
         else:
             index=index.item()
             d0=np.array([float(line[1]), float(line[2]), float(line[3])])            

@@ -29,19 +29,11 @@ def save_polygon_mesh_to_inp(mesh, filename):
             raise ValueError('not supported element:'+str(k))
         if element_type != element_type_prev:
             inp.append('*ELEMENT, TYPE = '+element_type+'\n')
-        if len(e) == 3:
-            inp.append(str(k+1)
-                       +', '+str(int(e[0])+1)
-                       +', '+str(int(e[1])+1)
-                       +', '+str(int(e[2])+1)
-                       +'\n')
-        elif len(e) == 4:
-            inp.append(str(k+1)
-                       +', '+str(int(e[0])+1)
-                       +', '+str(int(e[1])+1)
-                       +', '+str(int(e[2])+1)
-                       +', '+str(int(e[3])+1)
-                       +'\n')
+        line=str(k+1)
+        for m in range(0, len(e)):
+            line=line+', '+str(int(e[m])+1)
+        line=line+'\n'
+        inp.append(line)
         element_type_prev=element_type
     inp.append('*End Part' + '\n')
     with open(filename, 'w') as file:
@@ -67,37 +59,17 @@ def save_polyhedron_mesh_to_inp(mesh, filename):
             element_type='C3D6'
         elif len(e) == 8:
             element_type='C3D8'
+        elif len(e) == 10:
+            element_type='C3D10'
         else:
             raise ValueError('not supported element:'+str(k))
         if element_type != element_type_prev:
             inp.append('*ELEMENT, TYPE = '+element_type+'\n')
-        if len(e) == 4:
-            inp.append(str(k+1)
-                       +', '+str(int(e[0])+1)
-                       +', '+str(int(e[1])+1)
-                       +', '+str(int(e[2])+1)
-                       +', '+str(int(e[3])+1)
-                       +'\n')
-        elif len(e) == 6:
-            inp.append(str(k+1)
-                       +', '+str(int(e[0])+1)
-                       +', '+str(int(e[1])+1)
-                       +', '+str(int(e[2])+1)
-                       +', '+str(int(e[3])+1)
-                       +', '+str(int(e[4])+1)
-                       +', '+str(int(e[5])+1)
-                       +'\n')
-        elif len(e) == 8:
-            inp.append(str(k+1)
-                       +', '+str(int(e[0])+1)
-                       +', '+str(int(e[1])+1)
-                       +', '+str(int(e[2])+1)
-                       +', '+str(int(e[3])+1)
-                       +', '+str(int(e[4])+1)
-                       +', '+str(int(e[5])+1)
-                       +', '+str(int(e[6])+1)
-                       +', '+str(int(e[7])+1)
-                       +'\n')
+        line=str(k+1)
+        for m in range(0, len(e)):
+            line=line+', '+str(int(e[m])+1)
+        line=line+'\n'
+        inp.append(line)
         element_type_prev=element_type
     inp.append('*End Part' + '\n')
     with open(filename, 'w') as file:

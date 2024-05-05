@@ -5,10 +5,11 @@ Created on Mon May 16 22:07:37 2022
 @author: liang
 """
 import torch
-from torch_sparse import SparseTensor
+#from torch_sparse import SparseTensor
 import numpy as np
 from copy import deepcopy
 from SaveMeshAsVTKFile import save_polygon_mesh_to_vtk, save_polyhedron_mesh_to_vtk
+import os
 _Flag_VTK_IMPORT_=False
 try:
     import vtk
@@ -103,6 +104,8 @@ class Mesh:
             self.element_to_element_adj_table={"node":None, "edge":None, "face":None}
 
     def load_from_stl(self, filename, dtype):
+        if not os.path.isfile(filename):
+            raise ValueError("not exist: "+filename)
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError("vtk is not imported")
         if isinstance(dtype, str):
@@ -122,6 +125,8 @@ class Mesh:
         self.read_mesh_vtk(mesh_vtk, dtype)
     
     def load_from_vtp(self, filename, dtype):
+        if not os.path.isfile(filename):
+            raise ValueError("not exist: "+filename)
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError("vtk is not imported")
         if isinstance(dtype, str):
@@ -144,6 +149,8 @@ class Mesh:
             raise ValueError('cannot convert vtk data to mesh')
 
     def load_from_vtk(self, filename, dtype):
+        if not os.path.isfile(filename):
+            raise ValueError("not exist: "+filename)
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError("vtk is not imported")
         if isinstance(dtype, str):
@@ -372,6 +379,8 @@ class Mesh:
         torch.save(data,  filename)
 
     def load_from_torch(self, filename):
+        if not os.path.isfile(filename):
+            raise ValueError("not exist: "+filename)
         data=torch.load(filename, map_location="cpu")
         if "node" in data.keys():
             self.node=data["node"]

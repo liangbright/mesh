@@ -6,8 +6,7 @@ Created on Thu Feb 22 18:30:52 2024
 """
 
 import torch
-import torch_scatter
-from torch_sparse import SparseTensor
+#import torch_scatter
 import numpy as np
 from torch.linalg import det, cross
 from PolyhedronMesh import PolyhedronMesh

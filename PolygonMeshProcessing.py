@@ -20,7 +20,7 @@ try:
 except:
     print("cannot import vtk")
 #%%
-def TracePolygonMeshBoundaryCurve(mesh, start_node_idx, next_node_idx=None):
+def TracePolygonMeshBoundaryCurve(mesh, start_node_idx, next_node_idx=None, end_node_idx=None):
     #trace boundary starting from start_node_idx -> next_node_idx -> ...
     #this function may not work well if two boundary curves share points
     if not isinstance(mesh, PolygonMesh):
@@ -32,18 +32,26 @@ def TracePolygonMeshBoundaryCurve(mesh, start_node_idx, next_node_idx=None):
     boundary_node, boundary_edge=mesh.find_boundary_node_and_edge()
     BoundaryCurve=[]
     if start_node_idx not in boundary_node:
-        return BoundaryCurve
+        raise ValueError('start_node('+str(start_node_idx)+') is not a boundary node')
     if next_node_idx is not None:
+        if next_node_idx not in boundary_node:
+            raise ValueError('next_node('+str(next_node_idx)+') is not a boundary node')
         edge_idx=mesh.get_edge_idx_from_node_pair(start_node_idx, next_node_idx) 
         if edge_idx not in boundary_edge:
-            return BoundaryCurve
+            raise ValueError('no boundary edge between node('+str(start_node_idx)+') and node('+str(next_node_idx)+')')
         else:
             BoundaryCurve.append(start_node_idx)
             start_node_idx=next_node_idx
+    if end_node_idx is not None:
+        if end_node_idx not in boundary_node:
+            raise ValueError('end_node('+str(end_node_idx)+') is not a boundary node')
+            #return BoundaryCurve
     #---------
     idx_next=start_node_idx
     while True:
         BoundaryCurve.append(idx_next)
+        if idx_next == end_node_idx:
+            break
         edge_idx_list=mesh.node_to_edge_adj_table[idx_next]
         flag=False
         for edge_idx in edge_idx_list:
@@ -230,8 +238,8 @@ def ProjectPointToSurface(mesh, point, mesh_vtk=None):
         testPoint = [float(point[k][0]), float(point[k][1]), float(point[k][2])]
         closestPoint=[0, 0, 0] #the coordinates of the closest point will be returned here
         closestPointDist2=vtk.reference(0) #the squared distance to the closest point will be returned here
-        cellId= vtk.reference(0); #the cell id of the cell containing the closest point will be returned here
-        subId= vtk.reference(0); #this is rarely used (in triangle strips only, I believe)
+        cellId=vtk.reference(0); #the cell id of the cell containing the closest point will be returned here
+        subId=vtk.reference(0);  #this is rarely used (in triangle strips only, I believe)
         CellLocator.FindClosestPoint(testPoint, closestPoint, cellId, subId, closestPointDist2);
         point_proj.append(closestPoint)
         face_proj.append(int(cellId))
@@ -247,8 +255,32 @@ def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters):
         node_proj, face_proj=ProjectPointToSurface(mesh_fixed, mesh_move.node, mesh_fixed_vtk)        
         temp=mask.view(-1)
         mesh_move.node[temp>0]=node_proj[temp>0]
-
-
-
-
+#%%
+def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None):
+    if mesh_vtk is None:
+        mesh_vtk=mesh.convert_to_vtk()
+    trifilter=vtk.vtkTriangleFilter()
+    trifilter.SetInputData(mesh_vtk)
+    trifilter.Update()
+    output_mesh=TriangleMesh()
+    output_mesh.read_mesh_vtk(trifilter.GetOutput())
+    return output_mesh
+#%%
+def ClipPolygonMesh(mesh, origin, normal, mesh_vtk=None):
+    #origin and normal define the cut plane
+    if mesh_vtk is None:
+        mesh_vtk=mesh.convert_to_vtk()
+    plane=vtk.vtkPlane()
+    plane.SetOrigin(float(origin[0]), float(origin[1]), float(origin[2]))
+    plane.SetNormal(float(normal[0]), float(normal[1]), float(normal[2]))
+    clipper=vtk.vtkClipPolyData()
+    clipper.SetInputData(mesh_vtk)
+    clipper.SetClipFunction(plane)
+    clipper.SetValue(0)
+    clipper.Update()    
+    cleaner=vtk.vtkCleanPolyData()
+    cleaner.SetInputData(clipper.GetOutput())
+    cleaner.Update()    
+    output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput())
+    return output_mesh
 

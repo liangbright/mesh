@@ -8,7 +8,9 @@ import torch
 #from torch_sparse import SparseTensor
 import numpy as np
 from copy import deepcopy
-from SaveMeshAsVTKFile import save_polygon_mesh_to_vtk, save_polyhedron_mesh_to_vtk
+from SaveMeshAsVTKFile import (save_polyline_as_vtk, 
+                               save_polygon_mesh_to_vtk, 
+                               save_polyhedron_mesh_to_vtk)
 import os
 _Flag_VTK_IMPORT_=False
 try:
@@ -18,8 +20,10 @@ except:
     print("cannot import vtk")
 #%%
 class Mesh:
-    def __init__(self, node, element, dtype, element_type, mesh_type):
-        if ('polyhedron' not in mesh_type) and ('polygon' not in mesh_type):
+    def __init__(self, node, element, element_type, mesh_type):
+        if (('polyhedron' not in mesh_type)
+            and ('polygon' not in mesh_type)
+            and ('polyline' not in mesh_type)):
             raise ValueError('unknown mesh_type: '+mesh_type)
         #--------------------------------------------------------------------
         self.name="" # name of the mesh
@@ -38,23 +42,12 @@ class Mesh:
         #--------------------------------------------------------------------
         if node is not None:
             if isinstance(node, list):
-                if dtype is not None:
-                    node=torch.tensor(node, dtype=dtype)
-                else:
-                    node=torch.tensor(node, dtype=torch.float32)
+                node=torch.tensor(node, dtype=torch.float32)
             elif isinstance(node, np.ndarray):
-                if dtype is not None:
-                    node=torch.tensor(node, dtype=dtype)
+                if node.dtype == np.float64:
+                    node=torch.tensor(node, dtype=torch.float64)
                 else:
-                    if node.dtype == np.float64:
-                        node=torch.tensor(node, dtype=torch.float64)
-                    else:
-                        node=torch.tensor(node, dtype=torch.float32)
-            elif isinstance(node,  torch.Tensor):
-                if dtype is not None:
-                    node=node.to(dtype)
-            else:
-                raise ValueError("unsupported python-object type of node")
+                    node=torch.tensor(node, dtype=torch.float32)            
             self.node=node
         #--------------------------------------------------------------------
         if element is not None:
@@ -162,7 +155,7 @@ class Mesh:
                 raise ValueError('unsupported dtype:'+str(dtype))
         if 'polyhedron' in self.mesh_type:
             reader = vtk.vtkUnstructuredGridReader()
-        elif 'polygon' in self.mesh_type:
+        elif ('polygon' in self.mesh_type) or ('polyline' in self.mesh_type):
             reader = vtk.vtkPolyDataReader()
         else:
             raise ValueError('unsupported mesh_type:'+self.mesh_type)
@@ -238,6 +231,8 @@ class Mesh:
                 cell_type=vtk.VTK_QUADRATIC_TRIANGLE
             else:
                 cell_type=vtk.VTK_POLYGON
+        elif 'polyline' in mesh_type:
+            cell_type=vtk.VTK_POLY_LINE
         else:
             raise ValueError('unsupported mesh_type:'+mesh_type)
         return cell_type
@@ -257,7 +252,7 @@ class Mesh:
             Points_vtk.SetPoint(n, float(self.node[n,0]), float(self.node[n,1]), float(self.node[n,2]))
         if 'polyhedron' in self.mesh_type:
             mesh_vtk = vtk.vtkUnstructuredGrid()
-        elif 'polygon' in self.mesh_type:
+        elif ('polygon' in self.mesh_type) or 'polyline' in self.mesh_type:
             mesh_vtk = vtk.vtkPolyData()
         else:
             raise ValueError('unsupported mesh_type:'+self.mesh_type)
@@ -309,6 +304,8 @@ class Mesh:
                 save_polygon_mesh_to_vtk(self, filename)
                 if vtk42 == False:
                     print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False")
+            elif 'polyline' in self.mesh_type:
+                save_polyline_as_vtk(self, filename)
             else:
                 raise ValueError('unsupported mesh_type: '+self.mesh_type)
             return

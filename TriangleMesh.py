@@ -14,8 +14,8 @@ import PolygonMeshProcessing as pmp
 #%%
 class TriangleMesh(PolygonMesh):
     #3-node triangle element mesh
-    def __init__(self, node=None, element=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype)
+    def __init__(self, node=None, element=None):
+        super().__init__(node=node, element=element)
         self.mesh_type='polygon_tri3'
         self.node_normal=None
         self.element_area=None
@@ -125,7 +125,7 @@ class TriangleMesh(PolygonMesh):
         node_new=torch.cat([self.node, nodeA], dim=0)        
         element=self.element.tolist()
         element_new=[]
-        for m in range(0, element.shape[0]):
+        for m in range(0, len(element)):
             #-----------
             #     x2
             #    /  \
@@ -194,7 +194,7 @@ class TriangleMesh(PolygonMesh):
         node_new=torch.cat([self.node, nodeA, nodeB], dim=0)
         element=self.element.tolist()
         element_new=[]
-        for m in range(0, element.shape[0]):
+        for m in range(0, len(element)):
             #-----------
             #     x2
             #     /\

@@ -8,13 +8,17 @@ Created on Mon Sep 18 20:50:36 2023
 import torch
 import torch_scatter
 import numpy as np
+from PolylineMesh import PolylineMesh
 from PolygonMesh import PolygonMesh
 from TriangleMesh import TriangleMesh
 from QuadMesh import QuadMesh
 from QuadTriangleMesh import QuadTriangleMesh
 from copy import deepcopy
-from MeshProcessing import SimpleSmoother, SimpleSmootherForMesh, ComputeAngleBetweenTwoVectorIn3D, TracePolyline, \
-                            IsCurveClosed, MergeMesh, FindConnectedRegion, FindNearestNode
+from MeshProcessing import (SimpleSmoother, SimpleSmootherForMesh,
+                            ComputeAngleBetweenTwoVectorIn3D, TracePolyline,
+                            IsCurveClosed, MergeMesh, 
+                            FindConnectedRegion, FindNearestNode,
+                            FindNeighborNode)
 try:
     import vtk
 except:
@@ -256,20 +260,30 @@ def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters):
         temp=mask.view(-1)
         mesh_move.node[temp>0]=node_proj[temp>0]
 #%%
-def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None):
+def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
+    if dtype is None:
+        if mesh is not None:
+            dtype=mesh.node.dtype
+        else:
+            raise ValueError('dtype is unknown')
     trifilter=vtk.vtkTriangleFilter()
     trifilter.SetInputData(mesh_vtk)
     trifilter.Update()
     output_mesh=TriangleMesh()
-    output_mesh.read_mesh_vtk(trifilter.GetOutput())
+    output_mesh.read_mesh_vtk(trifilter.GetOutput(), dtype=dtype)
     return output_mesh
 #%%
-def ClipPolygonMesh(mesh, origin, normal, mesh_vtk=None):
+def ClipPolygonMesh(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
     #origin and normal define the cut plane
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
+    if dtype is None:
+        if mesh is not None:
+            dtype=mesh.node.dtype
+        else:
+            raise ValueError('dtype is unknown')
     plane=vtk.vtkPlane()
     plane.SetOrigin(float(origin[0]), float(origin[1]), float(origin[2]))
     plane.SetNormal(float(normal[0]), float(normal[1]), float(normal[2]))
@@ -277,10 +291,46 @@ def ClipPolygonMesh(mesh, origin, normal, mesh_vtk=None):
     clipper.SetInputData(mesh_vtk)
     clipper.SetClipFunction(plane)
     clipper.SetValue(0)
-    clipper.Update()    
-    cleaner=vtk.vtkCleanPolyData()
+    clipper.Update()
+    #cleaner=vtk.vtkCleanPolyData()
+    cleaner=vtk.vtkStaticCleanPolyData()    
     cleaner.SetInputData(clipper.GetOutput())
-    cleaner.Update()    
-    output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput())
+    cleaner.ToleranceIsAbsoluteOn()
+    cleaner.SetAbsoluteTolerance(eps)
+    cleaner.Update()
+    output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput(), dtype)
     return output_mesh
-
+#%%
+def ComputeCurvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
+    if mesh_vtk is None:
+        mesh_vtk=mesh.convert_to_vtk()
+    if dtype is None:
+        if mesh is not None:
+            dtype=mesh.node.dtype
+        else:
+            raise ValueError('dtype is unknown')
+    cc = vtk.vtkCurvatures()
+    cc.SetInputData(mesh_vtk)
+    if 'gaussian' in curvature_name.lower():
+        curvature_name='Gaussian_Curvature'
+        cc.SetCurvatureTypeToGaussian()
+        cc.Update()
+    elif 'mean' in curvature_name.lower():
+        curvature_name='Mean_Curvature'
+        cc.SetCurvatureTypeToMean()
+        cc.Update()
+    elif 'max' in curvature_name.lower():
+        curvature_name='Max_Curvature'
+        cc.SetCurvatureTypeToMaximum()
+        cc.Update()
+    elif 'min' in curvature_name.lower():
+        curvature_name='Min_Curvature'
+        cc.SetCurvatureTypeToMinimum()
+        cc.Update()
+    else:
+        raise ValueError('uknown curvature_name'+curvature_name)
+    data=cc.GetOutput().GetPointData().GetAbstractArray(curvature_name)
+    curvature=torch.zeros((data.GetNumberOfTuples(), ), dtype=dtype)
+    for i in range(0, curvature.shape[0]):
+            curvature[i]=data.GetComponent(i,0)
+    return curvature

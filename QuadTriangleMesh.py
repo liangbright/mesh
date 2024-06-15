@@ -14,8 +14,8 @@ from TriangleMesh import TriangleMesh
 class QuadTriangleMesh(PolygonMesh):
     #element could be quad or triangle
 
-    def __init__(self, node=None, element=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype)
+    def __init__(self, node=None, element=None):
+        super().__init__(node=node, element=element)
         self.mesh_type='polygon_quad4_tri3'
         self.node_normal=None
         self.element_area=None
@@ -66,10 +66,6 @@ class QuadTriangleMesh(PolygonMesh):
 
     def load_from_torch(self, filename):
         super().load_from_torch(filename)
-        self.classify_element()
-
-    def quad_to_tri(self):
-        super().quad_to_tri()
         self.classify_element()
 
     def copy(self, node, element, dtype=None, detach=True):

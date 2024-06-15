@@ -14,8 +14,8 @@ import PolygonMeshProcessing as pmp
 class QuadMesh(PolygonMesh):
     #4-node quad element mesh
 
-    def __init__(self, node=None, element=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype)
+    def __init__(self, node=None, element=None):
+        super().__init__(node=node, element=element)
         self.mesh_type='polygon_quad4'
         self.node_normal=None
         self.element_area=None

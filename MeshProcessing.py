@@ -329,6 +329,36 @@ def FindNearestNode(mesh, point, distance_threshold=np.inf):
         return node_idx_list
     else:
         return node_idx_list[0]
+#%%
+def FindNeighborNode(mesh, node_idx, max_n_hop):
+    if isinstance(node_idx, int):
+        node_idx=[node_idx]
+    elif isinstance(node_idx, tuple):
+        node_idx=list(node_idx)
+    elif isinstance(node_idx, list):
+        pass
+    else:
+        raise ValueError('node_idx must be int, tuple, or list')
+    mesh.build_node_to_node_adj_table()
+    adj_table=mesh.node_to_node_adj_table
+    neighbor_node_list=node_idx
+    active_node_list=node_idx
+    n_hop=0
+    while True:
+        new_active_node_list=[]
+        node_set=set(neighbor_node_list)
+        for idx in active_node_list:
+            adj_idx_list=adj_table[idx]
+            adj_idx_list=list(set(adj_idx_list)-node_set)
+            new_active_node_list.extend(adj_idx_list)
+        if len(new_active_node_list) ==0:
+            break
+        active_node_list=np.unique(new_active_node_list).tolist()
+        neighbor_node_list.extend(active_node_list)
+        n_hop+=1
+        if n_hop >= max_n_hop:
+            break
+    return neighbor_node_list
     
         
         

@@ -14,8 +14,8 @@ from PolyhedronMesh import PolyhedronMesh
 #%%
 class HexahedronMesh(PolyhedronMesh):
     #8-node C3D8 mesh
-    def __init__(self, node=None, element=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype)
+    def __init__(self, node=None, element=None):
+        super().__init__(node=node, element=element)
         self.mesh_type='polyhedron_hex8'
 
     def build_edge(self):

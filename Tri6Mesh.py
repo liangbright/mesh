@@ -27,8 +27,8 @@ class Tri6Mesh(PolygonMesh):
     #  /      \
     # x0--x3--x1
     # node order in an element: [x0, x1, x2, x3, x4, x5]
-    def __init__(self, node=None, element=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype)
+    def __init__(self, node=None, element=None):
+        super().__init__(node=node, element=element)
         self.mesh_type='polygon_tri6'
         self.node_normal=None
         self.element_area=None

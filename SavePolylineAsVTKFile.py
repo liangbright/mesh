@@ -11,7 +11,7 @@ def save_curve_as_vtk(curve_list, filename):
     if not isinstance(curve_list, list):
         raise ValueError('input curve_list must be a list')
     node, line=convert_curve_to_polyline(curve_list)
-    save_polyline_as_vtk(node, line, filename)
+    save_polyline_as_vtk(filename, node, line)
 
 def convert_curve_to_polyline(curve_list):
     #curve_list is a list of curves, each cure is a numpy array
@@ -27,15 +27,19 @@ def convert_curve_to_polyline(curve_list):
             line.append(np.arange(idx_start, idx_start+len(curve)).tolist())
     node=torch.tensor(node, dtype=torch.float64)
     return node, line
-    
-def save_polyline_as_vtk(node, line, filename):
+
+def save_polyline_as_vtk(filename, node, line=None, node_data=None):
     #node: (N, 3), 3D positions
     #line[k] is the k-th polyline, a list of node indexes
+    #node_data: {"stress":stress, "strain":strain}
+    if line is None:
+        #single line from node[0] to node[-1]
+        line=[np.arange(0, len(node)).tolist()]
     try:
         temp=line[0][0]
     except:
         raise ValueError("line needs to be a nested list")
-
+    
     out=[]
     out.append('# vtk DataFile Version 4.2'+'\n')
     out.append('vtk output'+'\n')
@@ -63,6 +67,21 @@ def save_polyline_as_vtk(node, line, filename):
             id=int(line[m][k])
             text=text+' '+str(id)
         out.append(text+'\n')
+    #------------------------------------------------------------------
+    if node_data is not None:
+        out.append('POINT_DATA '+str(node.shape[0])+'\n')
+        out.append('FIELD FieldData '+str(len(node_data.keys()))+'\n')
+    else:
+        node_data={}
+    for name, data in node_data.items():
+        out.append(name+' '+str(data.shape[1])+' '+str(data.shape[0])+' double'+'\n')
+        if isinstance(data, torch.Tensor):
+            data=data.detach().to('cpu')
+        for i in range(0, data.shape[0]):
+            line=''
+            for j in range(data.shape[1]):
+                line=line+str(float(data[i,j]))+' '
+            out.append(line+'\n')
     #------------------------------------------------------------------
     with open(filename, 'w', encoding = 'utf-8') as file:
         file.writelines(out)

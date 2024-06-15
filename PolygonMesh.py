@@ -11,8 +11,8 @@ from Mesh import Mesh
 import json
 #%%
 class PolygonMesh(Mesh):
-    def __init__(self, node=None, element=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype, element_type=None, mesh_type='polygon')        
+    def __init__(self, node=None, element=None):
+        super().__init__(node=node, element=element, element_type=None, mesh_type='polygon')
         
     def save_as_mdk_json(self, filename):
         #to be compatible with MDK SavePolygonMeshFromJsonDataFile
@@ -163,11 +163,11 @@ class PolygonMesh(Mesh):
                 return True
             else:
                 return False
-        m_list=[]
-        for m in range(0, len(self.element)):
-            m_list.append(len(self.element[m]))
-        m_min=min(m_list)
-        m_max=max(m_list)
+        m_min=len(self.element[0])
+        m_max=len(self.element[0])
+        for m in range(1, len(self.element)):
+            m_min=min(m_min, len(self.element[m]))
+            m_max=max(m_max, len(self.element[m]))
         if m_min == m_max == 4:
             return True
         else:
@@ -180,11 +180,11 @@ class PolygonMesh(Mesh):
                 return True
             else:
                 return False
-        m_list=[]
-        for m in range(0, len(self.element)):
-            m_list.append(len(self.element[m]))
-        m_min=min(m_list)
-        m_max=max(m_list)
+        m_min=len(self.element[0])
+        m_max=len(self.element[0])
+        for m in range(1, len(self.element)):
+            m_min=min(m_min, len(self.element[m]))
+            m_max=max(m_max, len(self.element[m]))
         if m_min == m_max == 3:
             return True
         else:
@@ -197,11 +197,11 @@ class PolygonMesh(Mesh):
                 return True
             else:
                 return False
-        m_list=[]
-        for m in range(0, len(self.element)):
-            m_list.append(len(self.element[m]))
-        m_min=min(m_list)
-        m_max=max(m_list)
+        m_min=len(self.element[0])
+        m_max=len(self.element[0])
+        for m in range(1, len(self.element)):
+            m_min=min(m_min, len(self.element[m]))
+            m_max=max(m_max, len(self.element[m]))
         if (m_min == m_max == 3) or (m_min == m_max == 4):
             return True
         else:
@@ -256,8 +256,8 @@ class PolygonMesh(Mesh):
                 m_list.append(3)
             else:
                 element_new.append(elm)
-                m_list.append(len(elm))        
-        new_mesh=PolygonMesh(self.node.clone(), element_new)        
+                m_list.append(len(elm))   
+        new_mesh=PolygonMesh(self.node.clone(), element_new)   
         return new_mesh
 
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):

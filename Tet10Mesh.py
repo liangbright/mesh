@@ -13,8 +13,8 @@ from PolyhedronMesh import PolyhedronMesh
 #%%
 class Tet10Mesh(PolyhedronMesh):
     #10-node C3D10/TET10 mesh
-    def __init__(self, node=None, element=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype)
+    def __init__(self, node=None, element=None):
+        super().__init__(node=node, element=element)
         self.mesh_type='polyhedron_tet10'
 
     def build_edge(self):

@@ -5,7 +5,7 @@ from HexahedronMesh import HexahedronMesh as HexMesh
 #%%
 def create_quad_cylinder_mesh(n_rings, n_points_per_ring, dtype=torch.float32):
     theta=2*np.pi/n_points_per_ring
-    node=np.zeros((n_rings*n_points_per_ring, 3))
+    node=torch.zeros((n_rings*n_points_per_ring, 3), dtype=dtype)
     k=-1
     for n in range(0, n_rings):
         for m in range(0, n_points_per_ring):
@@ -23,7 +23,7 @@ def create_quad_cylinder_mesh(n_rings, n_points_per_ring, dtype=torch.float32):
         for i in range(0, n_points_per_ring-1):
             element.append([idxA[i], idxA[i+1], idxB[i+1], idxB[i]])
         element.append([idxA[n_points_per_ring-1], idxA[0], idxB[0], idxB[n_points_per_ring-1]])
-    cylinder=QuadMesh(node, element, dtype)
+    cylinder=QuadMesh(node, element)
     return cylinder
 #%%
 def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):
@@ -49,7 +49,7 @@ def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):
             element[id,1]=map[y,x+1]
             element[id,2]=map[y+1,x+1]
             element[id,3]=map[y+1,x]
-    grid_mesh=QuadMesh(node, element, dtype)
+    grid_mesh=QuadMesh(node, element)
     grid_mesh.node_set['boundary']=boundary
     return grid_mesh
 #%%
@@ -83,7 +83,7 @@ def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32):
                 element[id,5]=map[z+1,y,x+1]
                 element[id,6]=map[z+1,y+1,x+1]
                 element[id,7]=map[z+1,y+1,x]
-    grid_mesh=HexMesh(grid, element, dtype)
+    grid_mesh=HexMesh(grid, element)
     grid_mesh.node_set['boundary']=boundary
     return grid_mesh
 #%%

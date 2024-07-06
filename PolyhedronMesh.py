@@ -10,8 +10,8 @@ from Mesh import Mesh
 #%%
 class PolyhedronMesh(Mesh):
     # use this class to handle mixture of tetra and hex elements
-    def __init__(self, node=None, element=None, element_type=None, dtype=None):
-        super().__init__(node=node, element=element, dtype=dtype, element_type=element_type, mesh_type='polyhedron')
+    def __init__(self, node=None, element=None, element_type=None):
+        super().__init__(node=node, element=element, element_type=element_type, mesh_type='polyhedron')
     
     def build_face_to_element_adj_table(self):
         if self.element_to_face_adj_table is None:

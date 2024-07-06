@@ -35,9 +35,13 @@ class QuadTriangleMesh(PolygonMesh):
             if len(self.element[0]) == 4:
                 self.quad_element=self.element
                 self.quad_element_idx=np.arange(0, len(self.element)).tolist()
+                self.tri_element=[]
+                self.tri_element_idx=[]
             elif len(self.element[0]) == 3:
                 self.tri_element=self.element
                 self.tri_element_idx=np.arange(0, len(self.element)).tolist()
+                self.quad_element=[]
+                self.quad_element_idx=[]
             else:
                 raise ValueError("len(self.element[0])="+str(len(self.element[0])))
             return

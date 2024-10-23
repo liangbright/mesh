@@ -334,3 +334,25 @@ def ComputeCurvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
     for i in range(0, curvature.shape[0]):
             curvature[i]=data.GetComponent(i,0)
     return curvature
+#%%
+def FillHole(mesh, hole_size, mesh_vtk=None, dtype=None):
+    if mesh_vtk is None:
+        mesh_vtk=mesh.convert_to_vtk()
+    if dtype is None:
+        if mesh is not None:
+            dtype=mesh.node.dtype
+        else:
+            raise ValueError('dtype is unknown')
+    filter=vtk.vtkFillHolesFilter()
+    filter.SetInputData(mesh_vtk)
+    filter.SetHoleSize(hole_size)
+    filter.Update()    
+    normals = vtk.vtkPolyDataNormals()
+    normals.SetInputData(filter.GetOutput())
+    normals.ConsistencyOn()
+    normals.SplittingOff()
+    normals.Update()    
+    mesh_vtk_new=normals.GetOutput()
+    output_mesh=ConvertPolygonMeshToTriangleMesh(None, mesh_vtk_new, dtype)
+    return output_mesh
+    

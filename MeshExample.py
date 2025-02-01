@@ -87,9 +87,98 @@ def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32):
     grid_mesh.node_set['boundary']=boundary
     return grid_mesh
 #%%
+def create_quad_mesh_square_in_square_simple(n_squares=2):
+#0-----7-----6
+#|     _     |
+#1    |_|    5
+#|           |
+#2-----3-----4
+    if n_squares < 2:
+        raise ValueError("n_squares must be >= 2")
+    square0=torch.tensor([[-1,1,0], [-1,0,0], [-1,-1,0], [0,-1,0], [1,-1,0], [1,0,0], [1,1,0], [0,1,0]],
+                         dtype=torch.float32)
+    squareN=square0/n_squares
+    square_list=[square0]
+    for n in range(1, n_squares-1):
+        square=square0+(squareN-square0)*(n/(n_squares-1))
+        square_list.append(square)
+    square_list.append(squareN)
+    element=[]; node=[]
+    K=len(square0)
+    for n in range(0, n_squares-1):
+        square_n=square_list[n]
+        #square_n1=square_list[n+1]
+        node.extend(square_n.tolist())        
+        for m in range(0, K):
+            if m < K-1:
+                idx0=n*K+m
+                idx1=n*K+m+1
+                idx2=(n+1)*K+m+1
+                idx3=(n+1)*K+m
+            else:
+                idx0=n*K+m
+                idx1=n*K
+                idx2=(n+1)*K
+                idx3=(n+1)*K+m
+            element.append([idx0, idx1, idx2, idx3])
+    node.extend(squareN.tolist())
+    #seal the hole    
+    node.append([0,0,0])#center node
+    N=n_squares-1
+    element.append([(N+1)*K, N*K+7, N*K+0, N*K+1])
+    element.append([(N+1)*K, N*K+1, N*K+2, N*K+3])
+    element.append([(N+1)*K, N*K+3, N*K+4, N*K+5])
+    element.append([(N+1)*K, N*K+5, N*K+6, N*K+7])
+    square_mesh=QuadMesh(node, element)
+    return square_mesh        
+#%%
+def create_quad_mesh_square_in_square(n_squares=2, Nx=3, Ny=3):
+    if n_squares < 2:
+        raise ValueError("n_squares must be >= 2")
+    inner_mesh=create_quad_grid_mesh(Nx, Ny)
+    inner_mesh.node-=inner_mesh.node.mean(dim=0, keepdim=True)
+    inner_mesh.node/=max(Nx, Ny)*n_squares    
+    #D-----------C
+    #|     _     |
+    #|    |_|    |
+    #|           |
+    #A-----------B
+    square0_idx=(np.arange(0,Nx).tolist()+ [Nx-1+Nx*n for n in range(1, Ny)] + [Nx*Ny-1-n for n in range(1, Nx)]
+                 + [Nx*(Ny-1)-Nx*n for n in range(1,Ny-1)])
+    square0=inner_mesh.node[square0_idx]        
+    element=inner_mesh.element.tolist()
+    node=inner_mesh.node.tolist()
+    idx_start=len(node)
+    node.extend(square0.tolist())
+    K=len(square0)
+    squareN=square0*n_squares
+    for n in range(1, n_squares):
+        square_n=square0+(squareN-square0)*n/(n_squares-1) 
+        node.extend(square_n.tolist())        
+        for m in range(0, K):
+            if m < K-1:
+                idx0=idx_start+n*K+m
+                idx1=idx_start+n*K+m+1
+                idx2=idx_start+(n-1)*K+m+1
+                idx3=idx_start+(n-1)*K+m
+            else:
+                idx0=idx_start+n*K+m
+                idx1=idx_start+n*K
+                idx2=idx_start+(n-1)*K
+                idx3=idx_start+(n-1)*K+m
+            element.append([idx0, idx1, idx2, idx3])
+    square_mesh=QuadMesh(node, element)
+    return square_mesh
+#%%
 if __name__ == '__main__':
     mesh0=create_quad_grid_mesh(10,20)
     mesh0.save_as_vtk("D:/MLFEA/TAA/mesh/quad_grid_mesh_x10y20.vtk")
 
     mesh1=create_hex_grid_mesh(10,20,2)
     mesh1.save_as_vtk("D:/MLFEA/TAA/mesh/hex_grid_mesh_x10y20z2.vtk")
+    #%%
+    mesh2=create_quad_mesh_square_in_square(n_squares=3, Nx=3, Ny=3)
+    mesh2.save_as_vtk("D:/MLFEA/TAA/mesh/quad_mesh_square_in_square.vtk")
+    #mesh2=mesh2.subdivide_to_quad()
+    #mesh2=mesh2.subdivide_to_quad()
+    #mesh2.save_as_vtk("D:/MLFEA/TAA/mesh/quad_mesh_square_in_square_sub2.vtk")

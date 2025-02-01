@@ -281,7 +281,7 @@ def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
         for k in range(0, len(elm)):
             elm[k]=node_idx_map_B_to_Out[elm[k]]
 
-    meshAB=Mesh(nodeAB, elementAB, dtype=meshA.node.dtype, element_type=None, mesh_type=meshA.mesh_type)
+    meshAB=Mesh(nodeAB, elementAB, element_type=None, mesh_type=meshA.mesh_type)
     return meshAB
 #%%
 def RemoveUnusedNode(mesh, return_node_idx_list=False, clear_adj_info=True):

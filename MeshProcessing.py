@@ -154,15 +154,20 @@ def SimpleSmoother(field, adj_link, lamda, mask, inplace):
     else:
         if isinstance(mask, list):
             mask=torch.tensor(mask, dtype=field.dtype, device=field.device)
-            mask=mask.view(-1,1)
+            if len(mask.shape)==1:
+                mask=mask.view(-1,1)
         elif isinstance(mask, np.ndarray):
             mask=torch.tensor(mask, dtype=field.dtype, device=field.device)
-            mask=mask.view(-1,1)
+            if len(mask.shape)==1:
+                mask=mask.view(-1,1)
         elif isinstance(mask, torch.Tensor):
             mask=mask.to(field.dtype).to(field.device)
-            mask=mask.view(-1,1)
+            if len(mask.shape)==1:
+                mask=mask.view(-1,1)
         else:
             raise ValueError('python-object type of mask is not supported')
+        if len(mask.shape)!=2:
+            raise ValueError('len(mask.shape)!=2')
     #---------
     x_j=field[adj_link[:,0]]
     x_i=field[adj_link[:,1]]
@@ -315,7 +320,7 @@ def FindNearestNode(mesh, point, distance_threshold=np.inf):
     if not isinstance(point, (torch.Tensor, np.ndarray)):
         raise ValueError("unsupported type "+str(type(point)))
     if isinstance(point, np.ndarray):
-        point=torch.tensor(point, mesh.node.dtype)    
+        point=torch.tensor(point, dtype=mesh.node.dtype)    
     flag=(len(point.shape) == 1)
     point=point.view(-1,3)
     node_idx_list=[]

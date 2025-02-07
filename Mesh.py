@@ -727,7 +727,7 @@ class Mesh:
         new_element_type=None
         if self.element_type is not None:
             new_element_type=self.element_type[element_idx_list]
-        new_mesh=Mesh(new_node, new_element, None, new_element_type, self.mesh_type)
+        new_mesh=Mesh(new_node, new_element, new_element_type, self.mesh_type)
         if return_node_idx_list == False:
             return new_mesh
         else:

@@ -301,6 +301,34 @@ def ClipPolygonMesh(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
     output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput(), dtype)
     return output_mesh
 #%%
+def SlicePolygonMesh(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
+    #similar to slice function in paraview
+    if mesh_vtk is None:
+        mesh_vtk=mesh.convert_to_vtk()
+    if dtype is None:
+        if mesh is not None:
+            dtype=mesh.node.dtype
+        else:
+            raise ValueError('dtype is unknown')
+    plane=vtk.vtkPlane()
+    plane.SetOrigin(float(origin[0]), float(origin[1]), float(origin[2]))
+    plane.SetNormal(float(normal[0]), float(normal[1]), float(normal[2]))
+    slicer=vtk.vtkPolyDataPlaneCutter()
+    slicer.SetInputData(mesh_vtk)
+    slicer.SetPlane(plane)
+    slicer.Update()
+    '''
+    cleaner=vtk.vtkStaticCleanPolyData()    
+    cleaner.SetInputData(slicer.GetOutput())
+    cleaner.ToleranceIsAbsoluteOn()
+    cleaner.SetAbsoluteTolerance(eps)
+    cleaner.Update()
+    '''
+    output_mesh=PolylineMesh()
+    output_mesh.read_mesh_vtk(slicer.GetOutput(), dtype=dtype)
+    #points are in random order
+    return output_mesh.node
+#%%
 def ComputeCurvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()

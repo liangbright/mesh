@@ -41,26 +41,33 @@ class Mesh:
         self.clear_adj_info() #initialize adj info to None
         #--------------------------------------------------------------------
         if node is not None:
-            if isinstance(node, list):
-                node=torch.tensor(node, dtype=torch.float32)
+            if torch.is_tensor(node):
+                self.node=node
+            elif isinstance(node, list):
+                self.node=torch.tensor(node, dtype=torch.float32)
             elif isinstance(node, np.ndarray):
                 if node.dtype == np.float64:
-                    node=torch.tensor(node, dtype=torch.float64)
+                    self.node=torch.tensor(node, dtype=torch.float64)
                 else:
-                    node=torch.tensor(node, dtype=torch.float32)            
-            self.node=node
+                    self.node=torch.tensor(node, dtype=torch.float32)
+            else:
+                raise ValueError("unsupported python-object type of node")
         #--------------------------------------------------------------------
         if element is not None:
-            if isinstance(element, list) or isinstance(node, np.ndarray):
+            if torch.is_tensor(element):
+                self.element=element
+            elif isinstance(element, np.ndarray):
                 try:
-                    element=torch.tensor(element, dtype=torch.int64)
+                    self.element=torch.tensor(element, dtype=torch.int64)
                 except:
-                    pass
-            elif isinstance(element, torch.Tensor):
-                  pass
+                    self.element=element.tolist()
+            elif isinstance(element, list):
+                try:
+                    self.element=torch.tensor(element, dtype=torch.int64)
+                except:
+                    self.element=element
             else:
                 raise ValueError("unsupported python-object type of element")
-            self.element=element
         #--------------------------------------------------------------------
         if element_type is not None:
             if isinstance(element_type, np.ndarray):

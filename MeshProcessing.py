@@ -134,6 +134,7 @@ def FindConnectedRegion(mesh, ref_element_idx, adj):
             break
         active_element_list=np.unique(new_active_element_list).tolist()
         region_element_list.extend(active_element_list)
+    #indexes of elements
     return region_element_list
 #%%
 def SegmentMeshToConnectedRegion(mesh, adj):
@@ -248,7 +249,7 @@ def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_
     return Polyline
 #%%
 def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
-    #Merge meshA (larger) and meshB (smaller)
+    #Merge: meshA <= meshB
     #The shared points are in node_idx_listA of meshA and node_idx_listB of meshB
     #if the distance between two nodes is <= distance_threshold, then merge the two nodes
     if (not isinstance(meshA, Mesh)) or (not isinstance(meshA, Mesh)):
@@ -256,7 +257,22 @@ def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
         print("warning: input may not be Mesh @ MergeMesh")
     if meshA.node.shape[0] == 0 or meshB.node.shape[0] == 0:
         raise ValueError("meshA or meshB is empty")
-
+    #---------------------------------------------------
+    if (node_idx_listA is None) or (node_idx_listB is None):
+        elementA=meshA.make_element_copy('list')
+        if not isinstance(meshB.element, list):
+            elementB=deepcopy(meshB.element)+len(meshA.node)
+            elementB=elementB.tolist()
+        else:
+            elementB=deepcopy(meshB.element)
+            for m in range(0, len(elementB)):
+                for n in range(0, len(elementB[m])):
+                    elementB[m][n]=elementB[m][n]+len(meshA.node)
+        nodeAB=meshA.node.tolist() + meshB.node.tolist()
+        elementAB=elementA + elementB
+        meshAB=Mesh(nodeAB, elementAB, element_type=None, mesh_type=meshA.mesh_type)
+        return meshAB
+    #---------------------------------------------------
     node_idx_map_B_to_Out=-1*np.ones(meshB.node.shape[0])
 
     A = meshA.node[node_idx_listA]

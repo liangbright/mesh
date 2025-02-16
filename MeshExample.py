@@ -185,7 +185,7 @@ if __name__ == '__main__':
     mesh1=create_hex_grid_mesh(10,20,2)
     mesh1.save_as_vtk("D:/MLFEA/TAA/mesh/hex_grid_mesh_x10y20z2.vtk")
     #%%
-    mesh2=create_quad_mesh_rectangle_in_rectangle(n_rings=16, Nx=16, Ny=16)
+    mesh2=create_quad_mesh_rectangle_in_rectangle(n_rings=5, Nx=5, Ny=5)
     mesh2.save_as_vtk("D:/MLFEA/TAA/mesh/quad_mesh_rect_in_rect.vtk")
     #mesh2=mesh2.subdivide_to_quad()
     #mesh2=mesh2.subdivide_to_quad()

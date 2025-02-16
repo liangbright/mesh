@@ -17,7 +17,7 @@ from copy import deepcopy
 from MeshProcessing import (SimpleSmoother, SimpleSmootherForMesh,
                             ComputeAngleBetweenTwoVectorIn3D, TracePolyline,
                             IsCurveClosed, MergeMesh, 
-                            FindConnectedRegion, FindNearestNode,
+                            FindConnectedRegion, FindNearestNode, SegmentMeshToConnectedRegion,
                             FindNeighborNode)
 try:
     import vtk
@@ -157,6 +157,7 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx, max_n
             print('break: len(region_element_list) > max_n_elements @ExtractRegionEnclosedByCurve')
             break
     #--------------
+    # indexes of elements in the region
     return region_element_list
 #%%
 def SegmentMeshByCurve(mesh, node_curve_list):

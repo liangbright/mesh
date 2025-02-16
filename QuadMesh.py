@@ -135,7 +135,7 @@ class QuadMesh(PolygonMesh):
 
     @staticmethod
     def cal_element_flatness(node, element):
-        # -1 (fold) <= flatness <= 1 (flat)
+        # 0 (fold) <= flatness <= 1 (flat)
         x0=node[element[:,0]]
         x1=node[element[:,1]]
         x2=node[element[:,2]]
@@ -168,7 +168,10 @@ class QuadMesh(PolygonMesh):
             d130_norm.data.clamp_(min=1e-12)
         d130=d130/d130_norm
         #-------------------------
-        flatness=0.5*((d023*d012).sum(dim=-1)+(d123*d130).sum(dim=-1))
+        #bad: gradient is not 0 when it is flat
+        #flatness=0.5*((d023*d012).sum(dim=-1)+(d123*d130).sum(dim=-1))
+        #good
+        flatness=1-0.125*(((d023-d012)**2).sum(dim=-1)+((d123-d130)**2).sum(dim=-1))
         return flatness
 
     def sample_points_on_elements(self, n_points):

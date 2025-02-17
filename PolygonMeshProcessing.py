@@ -231,7 +231,7 @@ def ProjectPointToSurface(mesh, point, mesh_vtk=None):
         #raise NotImplementedError
         pass
     if mesh.is_tri() == False:
-        raise NotImplementedError
+        raise NotImplementedError("only support triangle mesh")
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     CellLocator = vtk.vtkCellLocator()
@@ -251,10 +251,12 @@ def ProjectPointToSurface(mesh, point, mesh_vtk=None):
     point_proj=torch.tensor(point_proj, dtype=mesh.node.dtype)
     return point_proj, face_proj
 #%%
-def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters):
+def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mesh_fixed_vtk=None):
     #smooth mesh_move and project it to mesh_fixed
+    #mesh_move.node is modified
     #mesh_fixed must be a triangle mesh
-    mesh_fixed_vtk=mesh_fixed.convert_to_vtk()
+    if mesh_fixed_vtk is None:
+        mesh_fixed_vtk=mesh_fixed.convert_to_vtk()
     for k in range(0, n2_iters):
         SimpleSmootherForMesh(mesh_move, lamda, mask, n1_iters)
         node_proj, face_proj=ProjectPointToSurface(mesh_fixed, mesh_move.node, mesh_fixed_vtk)        
@@ -384,4 +386,26 @@ def FillHole(mesh, hole_size, mesh_vtk=None, dtype=None):
     mesh_vtk_new=normals.GetOutput()
     output_mesh=ConvertPolygonMeshToTriangleMesh(None, mesh_vtk_new, dtype)
     return output_mesh
-    
+#%%
+def FindDijkstraGraphGeodesicPath(mesh, start_node_idx, end_node_idx, mesh_vtk=None, dtype=None):
+    if mesh_vtk is None:
+        mesh_vtk=mesh.convert_to_vtk()
+    if dtype is None:
+        if mesh is not None:
+            dtype=mesh.node.dtype
+        else:
+            raise ValueError('dtype is unknown')
+    finder=vtk.vtkDijkstraGraphGeodesicPath()
+    finder.SetInputData(mesh_vtk)
+    finder.SetStartVertex(start_node_idx)
+    finder.SetEndVertex(end_node_idx)
+    finder.Update()
+    path_vtk=finder.GetOutput()
+    path=torch.zeros((path_vtk.GetNumberOfPoints(), 3), dtype=dtype)
+    for n in range(path_vtk.GetNumberOfPoints()):
+        p=path_vtk.GetPoint(n)
+        path[n,0]=p[0]
+        path[n,1]=p[1]
+        path[n,2]=p[2]
+    return path
+  

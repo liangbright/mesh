@@ -183,7 +183,7 @@ def SimpleSmoother(field, adj_link, lamda, mask, inplace):
 #%%
 def SimpleSmootherForMesh(mesh, lamda, mask, n_iters):
     #lamda: x_i = x_i + lamda*mean_j(x_j - x_i),  0<=lamda<=1
-    #inplace: True or False
+    #mesh.node is modified
     #if mask is not None: mask[k]: 1 to smooth the node-k; 0 not to smooth the node-k
     if not isinstance(mesh, Mesh):
         raise NotImplementedError

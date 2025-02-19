@@ -173,7 +173,27 @@ class QuadMesh(PolygonMesh):
         #good
         flatness=1-0.125*(((d023-d012)**2).sum(dim=-1)+((d123-d130)**2).sum(dim=-1))
         return flatness
-
+    
+    @staticmethod
+    def cal_local_surface_flatness(node, element, element_normal=None):
+        #local surface at each node
+        if element_normal is None:
+            element_area, element_normal=QuadMesh.cal_element_area_and_normal(node, element)
+        N=node.shape[0]
+        M=element.shape[0]
+        element_normal=element_normal.reshape(M,1,3).expand(M,4,3)
+        normal_mean=torch_scatter.scatter(element_normal.reshape(-1,3), element.reshape(-1), dim=0, dim_size=N, reduce="mean")
+        #normal_mean.shape (N,3)
+        normal_mean_norm=norm(normal_mean, ord=2, dim=-1, keepdim=True)
+        with torch.no_grad():
+            normal_mean.data.clamp_(min=1e-12) 
+        normal_mean=normal_mean/normal_mean_norm
+        normal_mean=normal_mean[element] #(M,4,3)
+        diff=((element_normal-normal_mean)**2).sum(dim=2)#(M,4)
+        variance=torch_scatter.scatter(diff.reshape(-1), element.view(-1), dim=0, dim_size=N, reduce="mean")
+        flatness=1-variance               
+        return flatness
+       
     def sample_points_on_elements(self, n_points):
          return QuadMesh.sample_points(self.node, self.element, n_points)
 

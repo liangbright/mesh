@@ -23,15 +23,18 @@ def scale(P1, P2):
     P2=P2/s
     return P1, P2
 
-def cal_distanceSQ(P1, P2, reduction, scale_input=True):
+def cal_distance(P1, P2, reduction, squared_distance, scale_input=True):
     #P1.shape:  Nx3 or Nx2, etc, N is the number of points in P1
     #P2.shape:  Mx3 or Mx2, etc, M is the number of points in P2
+    #set squared_distance=True for loss function
     #set scale_input=True to prevent issues in knn
     if scale_input==True:
         P1s, P2s=scale(P1, P2)
     index2=knn(P2s, P1s, 1)
     index2=index2[1]
     dist=((P2[index2]-P1)**2).sum(dim=-1)
+    if squared_distance == False:
+        dist=dist.sqrt()
     if reduction == 'mean':
         return dist.mean()
     elif reduction == 'sum':
@@ -41,9 +44,10 @@ def cal_distanceSQ(P1, P2, reduction, scale_input=True):
     else:
         raise ValueError('unknown reduction:'+reduction)    
 
-def cal_chamfer_distanceSQ(P1, P2, reduction, scale_input=True):
+def cal_chamfer_distance(P1, P2, reduction, squared_distance, scale_input=True):
     #P1.shape:  Nx3 or Nx2, etc, N is the number of points in P1
     #P2.shape:  Mx3 or Mx2, etc, M is the number of points in P2
+    #set squared_distance=True for loss function
     #set scale_input=True to prevent issues in knn
     if scale_input==True:
         P1s, P2s=scale(P1, P2)
@@ -53,6 +57,9 @@ def cal_chamfer_distanceSQ(P1, P2, reduction, scale_input=True):
     index2=index2[1]
     dist1=((P2[index2]-P1)**2).sum(dim=-1)
     dist2=((P1[index1]-P2)**2).sum(dim=-1)
+    if squared_distance == False:
+        dist1=dist1.sqrt()
+        dist2=dist2.sqrt()
     if reduction == 'mean':        
         return 0.5*(dist1.mean()+dist2.mean())
     elif reduction == 'sum':
@@ -62,9 +69,10 @@ def cal_chamfer_distanceSQ(P1, P2, reduction, scale_input=True):
     else:
         raise ValueError('unknown reduction:'+reduction)
 
-def cal_distanceSQ_batch(P1, P2, reduction, scale_input=True):
+def cal_distance_batch(P1, P2, reduction, squared_distance, scale_input=True):
     #P1 (B,N,2) or (B,N,3)
     #P2 (B,M,2) or (B,M,3)
+    #set squared_distance=True for loss function
     #set scale_input=True to prevent issues in knn
     if P1.shape[0] != P2.shape[0]:
         raise ValueError("P1.shape[0] != P2.shape[0]")
@@ -85,6 +93,8 @@ def cal_distanceSQ_batch(P1, P2, reduction, scale_input=True):
     index2=knn(P2s, P1s, 1, batch_P1,  batch_P2)
     index2=index2[1]
     dist=((P2[index2]-P1)**2).sum(dim=-1)
+    if squared_distance == False:
+        dist=dist.sqrt()
     if reduction == 'mean':        
         return dist.mean()
     elif reduction == 'sum':
@@ -94,9 +104,10 @@ def cal_distanceSQ_batch(P1, P2, reduction, scale_input=True):
     else:
         raise ValueError('unknown reduction:'+reduction)
 
-def cal_chamfer_distanceSQ_batch(P1, P2, reduction, scale_input=True):
+def cal_chamfer_distance_batch(P1, P2, reduction, squared_distance, scale_input=True):
     #P1 (B,N,2) or (B,N,3)
     #P2 (B,M,2) or (B,M,3)
+    #set squared_distance=True for loss function
     #set scale_input=True to prevent issues in knn
     if P1.shape[0] != P2.shape[0]:
         raise ValueError("P1.shape[0] != P2.shape[0]")
@@ -120,6 +131,9 @@ def cal_chamfer_distanceSQ_batch(P1, P2, reduction, scale_input=True):
     index2=index2[1]
     dist1=((P2[index2]-P1)**2).sum(dim=-1)
     dist2=((P1[index1]-P2)**2).sum(dim=-1)
+    if squared_distance == False:
+        dist1=dist1.sqrt()
+        dist2=dist2.sqrt()
     if reduction == 'mean':
         return 0.5*(dist1.mean()+dist2.mean())
     elif reduction == 'sum':
@@ -136,6 +150,6 @@ if __name__ == '__main__':
     assign_index = knn(x.view(-1,3), y.view(-1,3), 1)
     print(assign_index)
     print(assign_index[0].shape, assign_index[1].shape)
-    dist=cal_distanceSQ(x.view(-1,3), y.view(-1,3), "none")
-    dist1=cal_chamfer_distanceSQ(x.view(-1,3), y.view(-1,3), 'none')
-    dist2=cal_chamfer_distanceSQ_batch(x, y, 'none')
+    dist=cal_distance(x.view(-1,3), y.view(-1,3), "none", False)
+    dist1=cal_chamfer_distance(x.view(-1,3), y.view(-1,3), 'none', False)
+    dist2=cal_chamfer_distance_batch(x, y, 'none', False)

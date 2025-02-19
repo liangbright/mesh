@@ -251,17 +251,20 @@ def ProjectPointToSurface(mesh, point, mesh_vtk=None):
     point_proj=torch.tensor(point_proj, dtype=mesh.node.dtype)
     return point_proj, face_proj
 #%%
-def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mesh_fixed_vtk=None):
+def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mesh_fixed_vtk=None, smooth_first=True):
     #smooth mesh_move and project it to mesh_fixed
     #mesh_move.node is modified
     #mesh_fixed must be a triangle mesh
     if mesh_fixed_vtk is None:
         mesh_fixed_vtk=mesh_fixed.convert_to_vtk()
     for k in range(0, n2_iters):
-        SimpleSmootherForMesh(mesh_move, lamda, mask, n1_iters)
+        if smooth_first == True:
+            SimpleSmootherForMesh(mesh_move, lamda, mask, n1_iters)
         node_proj, face_proj=ProjectPointToSurface(mesh_fixed, mesh_move.node, mesh_fixed_vtk)        
         temp=mask.view(-1)
         mesh_move.node[temp>0]=node_proj[temp>0]
+        if smooth_first == False and k < n2_iters-1:
+            SimpleSmootherForMesh(mesh_move, lamda, mask, n1_iters)
 #%%
 def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None, dtype=None):
     if mesh_vtk is None:

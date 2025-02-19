@@ -21,10 +21,18 @@ class PolylineMesh(Mesh):
         element=[]
         dtype=None
         for k in range(0, len(curve_list)):
-            curve=curve_list[k]        
-            if isinstance(curve, torch.Tensor) or isinstance(curve, np.ndarray):
+            curve=curve_list[k]
+            if torch.is_tensor(curve):
                 dtype=curve.dtype
                 curve=curve.tolist()
+            elif isinstance(curve, np.ndarray):
+                if curve.dtype == np.float64:
+                    dtype=torch.float64
+                else:
+                    dtype=torch.float32
+                curve=curve.tolist()
+            elif isinstance(curve, list):
+                dtype=torch.float32
             else:
                 raise ValueError
             if len(curve) > 0:

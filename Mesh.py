@@ -329,7 +329,7 @@ class Mesh:
             return
         if 'polyhedron' in self.mesh_type:
             writer=vtk.vtkUnstructuredGridWriter()
-        elif 'polygon' in self.mesh_type:
+        elif ('polygon' in self.mesh_type) or ('polyline' in self.mesh_type):
             writer=vtk.vtkPolyDataWriter()
         else:
             raise ValueError('unsupported mesh_type: '+self.mesh_type)

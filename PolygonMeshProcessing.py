@@ -228,13 +228,11 @@ def ProjectPointToSurface(mesh, point, mesh_vtk=None):
     #ProjectPointToFaceByVTKCellLocator in MDK
     #point (N, 3)
     if not isinstance(mesh, PolygonMesh):
-        #raise NotImplementedError
-        pass
-    if mesh.is_tri() == False:
-        raise NotImplementedError("only support triangle mesh")
+        raise NotImplementedError
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
-    CellLocator = vtk.vtkCellLocator()
+    #CellLocator = vtk.vtkCellLocator()
+    CellLocator = vtk.vtkStaticCellLocator()
     CellLocator.SetDataSet(mesh_vtk)
     CellLocator.BuildLocator()
     point_proj=[]

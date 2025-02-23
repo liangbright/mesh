@@ -93,7 +93,10 @@ class Mesh:
         self.edge_to_edge_adj_table=None
         self.edge_to_element_adj_table=None# an edge of an element
         self.element_to_edge_adj_table=None# an edge of an element
-        if 'polygon' in self.mesh_type:
+        if 'polyline' in self.mesh_type:
+            self.element_to_element_adj_link={"node":None}
+            self.element_to_element_adj_table={"node":None}
+        elif 'polygon' in self.mesh_type:
             self.element_to_element_adj_link={"node":None, "edge":None}
             self.element_to_element_adj_table={"node":None, "edge":None}
         elif 'polyhedron' in self.mesh_type:
@@ -175,11 +178,14 @@ class Mesh:
             raise ValueError('cannot convert vtk data to mesh')
 
     def read_mesh_vtk(self, mesh_vtk, dtype):
+        #----------- load point/node --------------------#
         node=np.zeros((mesh_vtk.GetNumberOfPoints(), 3))
         for n in range(mesh_vtk.GetNumberOfPoints()):
             node[n]=mesh_vtk.GetPoint(n)
         if len(node) == 0:
             raise ValueError('cannot load node')
+        self.node=torch.tensor(node, dtype=dtype)
+        #----------- load element -----------------------#
         element=[]
         m_list=[]
         for n in range(mesh_vtk.GetNumberOfCells()):
@@ -190,11 +196,12 @@ class Mesh:
                 temp.append(cell_n.GetPointId(k))
             element.append(temp)
         if len(element) == 0:
-            raise ValueError('cannot load element')
-        self.node=torch.tensor(node, dtype=dtype)
+            #print('warning: cannot load element @ read_mesh_vtk')
+            pass
         self.element=element
-        if min(m_list) == max(m_list):
-            self.element=torch.tensor(element, dtype=torch.int64)
+        if len(element) > 0:
+            if min(m_list) == max(m_list):
+                self.element=torch.tensor(element, dtype=torch.int64)
         #---------- load PointData -----------#
         PointDataSetCount = mesh_vtk.GetPointData().GetNumberOfArrays()
         for n in range(0, PointDataSetCount):
@@ -385,7 +392,7 @@ class Mesh:
     def load_from_torch(self, filename):
         if not os.path.isfile(filename):
             raise ValueError("not exist: "+filename)
-        data=torch.load(filename, map_location="cpu")
+        data=torch.load(filename, map_location="cpu", weights_only=False)
         if "node" in data.keys():
             self.node=data["node"]
             if not isinstance(self.node, torch.Tensor):

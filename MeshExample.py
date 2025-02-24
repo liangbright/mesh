@@ -24,6 +24,8 @@ def create_quad_cylinder_mesh(n_circles, n_points_per_circle, radius=1, height=1
             element.append([idxA[i], idxA[i+1], idxB[i+1], idxB[i]])
         element.append([idxA[n_points_per_circle-1], idxA[0], idxB[0], idxB[n_points_per_circle-1]])
     cylinder=QuadMesh(node, element)
+    cylinder.node_set["boundary_lower"]=np.arange(0, n_points_per_circle).tolist()
+    cylinder.node_set["boundary_upper"]=np.arange((n_circles-1)*n_points_per_circle, n_circles*n_points_per_circle).tolist()
     return cylinder
 #%%
 def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):

@@ -5,7 +5,7 @@ Created on Mon May 16 22:07:37 2022
 @author: liang
 """
 import torch
-#from torch_sparse import SparseTensor
+from torch.linalg import vector_norm as norm
 import numpy as np
 from copy import deepcopy
 from SaveMeshAsVTKFile import (save_polyline_as_vtk, 
@@ -562,8 +562,8 @@ class Mesh:
     def cal_edge_length(node, edge):
         x_j=node[edge[:,0]]
         x_i=node[edge[:,1]]
-        edge_length=torch.norm(x_i-x_j, p=2, dim=1, keepdim=True)
-        return edge_length
+        edge_length=norm(x_i-x_j, ord=2, dim=1, keepdim=True)
+        return edge_length #(K,1)
 
     def build_node_to_node_adj_link(self):
         #no self link

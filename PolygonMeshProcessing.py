@@ -224,13 +224,19 @@ def SimpleSmootherForQuadMesh(mesh, lamda, mask, n_iters):
     for n in range(0, n_iters):
         SimpleSmoother(mesh.node, adj_link, lamda, mask, inplace=True)
 #%%
-def ProjectPointToSurface(mesh, point, mesh_vtk=None):
+#dtype is a necessary parameter of a function that is based on vtk functions
+# function(mesh, mesh_vtk, dtype) where mesh_vtk is the output of some vtk function and mesh does not exist
+#%%
+def ProjectPointToSurface(mesh, point, mesh_vtk=None, dtype=None):
     #ProjectPointToFaceByVTKCellLocator in MDK
     #point (N, 3)
-    if not isinstance(mesh, PolygonMesh):
-        raise NotImplementedError
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
+    if dtype is None:
+        if mesh is not None:
+            dtype=mesh.node.dtype
+        else:
+            raise ValueError('dtype is unknown')
     #CellLocator = vtk.vtkCellLocator()
     CellLocator = vtk.vtkStaticCellLocator()
     CellLocator.SetDataSet(mesh_vtk)
@@ -246,7 +252,7 @@ def ProjectPointToSurface(mesh, point, mesh_vtk=None):
         CellLocator.FindClosestPoint(testPoint, closestPoint, cellId, subId, closestPointDist2);
         point_proj.append(closestPoint)
         face_proj.append(int(cellId))
-    point_proj=torch.tensor(point_proj, dtype=mesh.node.dtype)
+    point_proj=torch.tensor(point_proj, dtype=dtype)
     return point_proj, face_proj
 #%%
 def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mesh_fixed_vtk=None, smooth_first=True):
@@ -279,7 +285,7 @@ def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None, dtype=None):
     output_mesh.read_mesh_vtk(trifilter.GetOutput(), dtype=dtype)
     return output_mesh
 #%%
-def ClipPolygonMesh(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
+def ClipPolygonMeshByPlane(mesh, origin, normal, return_clipped_output=False, eps=1e-5, mesh_vtk=None, dtype=None):
     #origin and normal define the cut plane
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -295,17 +301,28 @@ def ClipPolygonMesh(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
     clipper.SetInputData(mesh_vtk)
     clipper.SetClipFunction(plane)
     clipper.SetValue(0)
+    if return_clipped_output == True:
+        clipper.GenerateClippedOutputOn()
     clipper.Update()
     #cleaner=vtk.vtkCleanPolyData()
-    cleaner=vtk.vtkStaticCleanPolyData()    
+    cleaner=vtk.vtkStaticCleanPolyData()
     cleaner.SetInputData(clipper.GetOutput())
     cleaner.ToleranceIsAbsoluteOn()
     cleaner.SetAbsoluteTolerance(eps)
     cleaner.Update()
     output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput(), dtype)
-    return output_mesh
+    if return_clipped_output == False:
+        return output_mesh
+    #----------------------------------------
+    cleaner=vtk.vtkStaticCleanPolyData()
+    cleaner.SetInputData(clipper.GetClippedOutput())
+    cleaner.ToleranceIsAbsoluteOn()
+    cleaner.SetAbsoluteTolerance(eps)
+    cleaner.Update()
+    clipped_output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput(), dtype)
+    return output_mesh, clipped_output_mesh
 #%%
-def SlicePolygonMesh(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
+def SlicePolygonMeshByPlane(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
     #similar to slice function in paraview
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -364,7 +381,7 @@ def ComputeCurvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
     data=cc.GetOutput().GetPointData().GetAbstractArray(curvature_name)
     curvature=torch.zeros((data.GetNumberOfTuples(), ), dtype=dtype)
     for i in range(0, curvature.shape[0]):
-            curvature[i]=data.GetComponent(i,0)
+        curvature[i]=data.GetComponent(i,0)
     return curvature
 #%%
 def FillHole(mesh, hole_size, mesh_vtk=None, dtype=None):

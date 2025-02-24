@@ -108,7 +108,7 @@ class QuadTriangleMesh(PolygonMesh):
     def update_element_area_and_normal(self):
         if self.quad_element is None or self.tri_element is None:
             self.classify_element()
-        area=torch.zeros((len(self.element) ,1), dtype=self.node.dtype, device=self.node.device)
+        area=torch.zeros((len(self.element), 1), dtype=self.node.dtype, device=self.node.device)
         normal=torch.zeros((len(self.element), 3), dtype=self.node.dtype, device=self.node.device)
         if len(self.quad_element) > 0:
             area_quad, normal_quad=QuadMesh.cal_element_area_and_normal(self.node, self.quad_element)

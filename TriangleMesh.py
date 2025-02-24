@@ -61,20 +61,20 @@ class TriangleMesh(PolygonMesh):
 
     @staticmethod
     def cal_element_area_and_normal(node, element):
-        x0=node[element[:,0]]
-        x1=node[element[:,1]]
-        x2=node[element[:,2]]
+        x0=node[element[:,0]] #(M,3)
+        x1=node[element[:,1]] #(M,3)
+        x2=node[element[:,2]] #(M,3)
         #   x2
         #  /  \
         # x0--x1
         #normal is undefined if area is 0
         temp1=torch.cross(x1-x0, x2-x0, dim=-1)        
         temp2=norm(temp1, ord=2, dim=-1, keepdim=True)
-        area=0.5*temp2.abs()
+        area=0.5*temp2.abs() #(M,1)
         with torch.no_grad():
             #https://github.com/pytorch/pytorch/issues/43211
             temp2.data.clamp_(min=1e-12)
-        normal=temp1/temp2
+        normal=temp1/temp2 #(M,3)
         return area, normal
 
     @staticmethod

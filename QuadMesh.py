@@ -94,10 +94,10 @@ class QuadMesh(PolygonMesh):
     def cal_element_area_and_normal(node, element):
         #area is an estimation using 1 integration point
         #normal is at the center
-        x0=node[element[:,0]]
-        x1=node[element[:,1]]
-        x2=node[element[:,2]]
-        x3=node[element[:,3]]
+        x0=node[element[:,0]] #(M,3)
+        x1=node[element[:,1]] #(M,3)
+        x2=node[element[:,2]] #(M,3)
+        x3=node[element[:,3]] #(M,3)
         # x3--x2
         # |   |
         # x0--x1
@@ -105,10 +105,10 @@ class QuadMesh(PolygonMesh):
         dxdv=(1/4)*((x2+x3)-(x0+x1))
         cross_uv=cross(dxdu, dxdv, dim=-1)
         temp=norm(cross_uv, ord=2, dim=-1, keepdim=True)
-        area=4*temp.abs()
+        area=4*temp.abs() #(M,1)
         with torch.no_grad():
             temp.data.clamp_(min=1e-12)
-        normal=cross_uv/temp
+        normal=cross_uv/temp #(M,3)
         return area, normal
 
     def update_element_corner_angle(self):

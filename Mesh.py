@@ -8,7 +8,7 @@ import torch
 from torch.linalg import vector_norm as norm
 import numpy as np
 from copy import deepcopy
-from SaveMeshAsVTKFile import (save_polyline_as_vtk, 
+from SaveMeshAsVTKFile import (save_polyline_to_vtk, 
                                save_polygon_mesh_to_vtk, 
                                save_polyhedron_mesh_to_vtk)
 import os
@@ -151,11 +151,24 @@ class Mesh:
         except:
             raise ValueError('cannot convert vtk data to mesh')
 
-    def load_from_vtk(self, filename, dtype):
+    @staticmethod
+    def load_vtk_file(filename, mesh_type):
         if not os.path.isfile(filename):
             raise ValueError("not exist: "+filename)
         if _Flag_VTK_IMPORT_ == False:
-            raise ValueError("vtk is not imported")
+            raise ValueError("vtk is not imported")        
+        if 'polyhedron' in mesh_type:
+            reader = vtk.vtkUnstructuredGridReader()
+        elif ('polygon' in mesh_type) or ('polyline' in mesh_type):
+            reader = vtk.vtkPolyDataReader()
+        else:
+            raise ValueError('unsupported mesh_type:'+mesh_type)
+        reader.SetFileName(filename)
+        reader.Update()
+        mesh_vtk = reader.GetOutput()
+        return mesh_vtk
+    
+    def load_from_vtk(self, filename, dtype, return_mesh_vtk=False):
         if isinstance(dtype, str):
             if dtype == 'float32':
                 dtype=torch.float32
@@ -163,20 +176,14 @@ class Mesh:
                 dtype=torch.float64
             else:
                 raise ValueError('unsupported dtype:'+str(dtype))
-        if 'polyhedron' in self.mesh_type:
-            reader = vtk.vtkUnstructuredGridReader()
-        elif ('polygon' in self.mesh_type) or ('polyline' in self.mesh_type):
-            reader = vtk.vtkPolyDataReader()
-        else:
-            raise ValueError('unsupported mesh_type:'+self.mesh_type)
-        reader.SetFileName(filename)
-        reader.Update()
-        mesh_vtk = reader.GetOutput()
+        mesh_vtk=Mesh.load_vtk_file(filename, self.mesh_type)
         try:
             self.read_mesh_vtk(mesh_vtk, dtype)
         except:
             raise ValueError('cannot convert vtk data to mesh')
-
+        if return_mesh_vtk == True:
+            return mesh_vtk
+        
     def read_mesh_vtk(self, mesh_vtk, dtype):
         #----------- load point/node --------------------#
         node=np.zeros((mesh_vtk.GetNumberOfPoints(), 3))
@@ -225,8 +232,11 @@ class Mesh:
 
     @staticmethod
     def get_vtk_cell_type(mesh_type, n_nodes):
+        #n_nodes: the number of nodes in an element
         if 'polyhedron' in mesh_type:
-            if n_nodes == 4:
+            if n_nodes < 4:
+                raise ValueError('wrong number of nodes')
+            elif n_nodes == 4:
                 cell_type=vtk.VTK_TETRA
             elif n_nodes == 6:
                 cell_type=vtk.VTK_WEDGE
@@ -237,7 +247,9 @@ class Mesh:
             else:
                 cell_type=vtk.VTK_POLYHEDRON
         elif 'polygon' in mesh_type:
-            if n_nodes == 3:
+            if n_nodes < 3:
+                raise ValueError('wrong number of nodes')
+            elif n_nodes == 3:
                 cell_type=vtk.VTK_TRIANGLE
             elif n_nodes == 4:
                 cell_type=vtk.VTK_QUAD
@@ -246,7 +258,12 @@ class Mesh:
             else:
                 cell_type=vtk.VTK_POLYGON
         elif 'polyline' in mesh_type:
-            cell_type=vtk.VTK_POLY_LINE
+            if n_nodes < 2:
+                raise ValueError('wrong number of nodes')
+            elif n_nodes == 2:
+                cell_type=vtk.VTK_LINE 
+            else:
+                cell_type=vtk.VTK_POLY_LINE
         else:
             raise ValueError('unsupported mesh_type:'+mesh_type)
         return cell_type
@@ -255,8 +272,8 @@ class Mesh:
     def get_vtk_cell_type_from_element_type(element_type):
         #element_type: tri3, quad4, hex8, etc
         raise NotImplementedError
-
-    def convert_to_vtk(self):
+        
+    def convert_node_to_vtk(self):
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError("vtk is not imported")
         Points_vtk = vtk.vtkPoints()
@@ -264,6 +281,12 @@ class Mesh:
         Points_vtk.SetNumberOfPoints(len(self.node))
         for n in range(0, len(self.node)):
             Points_vtk.SetPoint(n, float(self.node[n,0]), float(self.node[n,1]), float(self.node[n,2]))
+        return Points_vtk        
+    
+    def convert_to_vtk(self):
+        if _Flag_VTK_IMPORT_ == False:
+            raise ValueError("vtk is not imported")
+        Points_vtk=self.convert_node_to_vtk()        
         if 'polyhedron' in self.mesh_type:
             mesh_vtk = vtk.vtkUnstructuredGrid()
         elif ('polygon' in self.mesh_type) or 'polyline' in self.mesh_type:
@@ -319,7 +342,7 @@ class Mesh:
                 if vtk42 == False:
                     print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False")
             elif 'polyline' in self.mesh_type:
-                save_polyline_as_vtk(self, filename)
+                save_polyline_to_vtk(self, filename)
             else:
                 raise ValueError('unsupported mesh_type: '+self.mesh_type)
             return

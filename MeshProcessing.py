@@ -216,6 +216,9 @@ def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_
     if not isinstance(mesh, Mesh):
         raise NotImplementedError
     #---------
+    start_node_idx=int(start_node_idx)
+    next_node_idx=int(next_node_idx)
+    #---------
     if mesh.node_to_node_adj_table is None:
         mesh.build_node_to_node_adj_table()
     node_adj_table=mesh.node_to_node_adj_table
@@ -270,7 +273,7 @@ def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
                     elementB[m][n]=elementB[m][n]+len(meshA.node)
         nodeAB=meshA.node.tolist() + meshB.node.tolist()
         elementAB=elementA + elementB
-        meshAB=Mesh(nodeAB, elementAB, element_type=None, mesh_type=meshA.mesh_type)
+        meshAB=Mesh(nodeAB, elementAB, meshA.element_type, meshA.mesh_type)
         return meshAB
     #---------------------------------------------------
     node_idx_map_B_to_Out=-1*np.ones(meshB.node.shape[0])
@@ -302,7 +305,7 @@ def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
         for k in range(0, len(elm)):
             elm[k]=node_idx_map_B_to_Out[elm[k]]
 
-    meshAB=Mesh(nodeAB, elementAB, element_type=None, mesh_type=meshA.mesh_type)
+    meshAB=Mesh(nodeAB, elementAB, meshA.element_type, meshA.mesh_type)
     return meshAB
 #%%
 def RemoveUnusedNode(mesh, return_node_idx_list=False, clear_adj_info=True):

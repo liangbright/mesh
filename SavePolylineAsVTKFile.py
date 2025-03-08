@@ -24,7 +24,10 @@ def convert_curve_to_polyline(curve_list):
         if len(curve) > 0:
             idx_start=len(node)
             node.extend(curve)
-            line.append(np.arange(idx_start, idx_start+len(curve)).tolist())
+            #poly_line.append(np.arange(idx_start, idx_start+len(curve)).tolist())
+            idx_list=np.arange(idx_start, idx_start+len(curve)).tolist()
+            for n in range(1, len(idx_list)):
+                line.append([idx_list[n-1], idx_list[n]]) #each element is VTK_LINE
     node=torch.tensor(node, dtype=torch.float64)
     return node, line
 

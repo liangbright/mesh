@@ -152,6 +152,7 @@ class PolygonMesh(Mesh):
             for node_idx in boundary_node:
                 adj_elm_idx=self.node_to_element_adj_table[node_idx]
                 boundary.extend(adj_elm_idx)
+            boundary=np.unique(boundary).tolist()
             return boundary
         else:
             raise ValueError

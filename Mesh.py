@@ -272,8 +272,8 @@ class Mesh:
     def get_vtk_cell_type_from_element_type(element_type):
         #element_type: tri3, quad4, hex8, etc
         raise NotImplementedError
-        
-    def convert_node_to_vtk(self):
+
+    def convert_to_vtk(self):
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError("vtk is not imported")
         Points_vtk = vtk.vtkPoints()
@@ -281,12 +281,6 @@ class Mesh:
         Points_vtk.SetNumberOfPoints(len(self.node))
         for n in range(0, len(self.node)):
             Points_vtk.SetPoint(n, float(self.node[n,0]), float(self.node[n,1]), float(self.node[n,2]))
-        return Points_vtk        
-    
-    def convert_to_vtk(self):
-        if _Flag_VTK_IMPORT_ == False:
-            raise ValueError("vtk is not imported")
-        Points_vtk=self.convert_node_to_vtk()        
         if 'polyhedron' in self.mesh_type:
             mesh_vtk = vtk.vtkUnstructuredGrid()
         elif ('polygon' in self.mesh_type) or 'polyline' in self.mesh_type:
@@ -331,8 +325,21 @@ class Mesh:
             mesh_vtk.GetCellData().AddArray(vtk_array)
         return mesh_vtk
 
-    def save_as_vtk(self, filename, vtk42=True, use_vtk=False):
-        if _Flag_VTK_IMPORT_ == False or use_vtk == False:
+    def save_as_vtk(self, filename, vtk42=True):
+        use_vtk=True
+        if _Flag_VTK_IMPORT_ == True:
+            if vtk42 == True:
+                version=vtk.vtkVersion.GetVTKVersion()
+                version=[int(a) for a in version.split('.')]
+                if version[0]<=8:
+                    pass
+                elif version[0]>=9 and version[1]>=1:
+                    pass
+                else:
+                    use_vtk=False
+        else:
+            use_vtk=False
+        if use_vtk == False:
             if 'polyhedron' in self.mesh_type:
                 save_polyhedron_mesh_to_vtk(self, filename)
                 if vtk42 == False:

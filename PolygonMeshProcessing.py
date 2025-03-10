@@ -238,7 +238,7 @@ def CutMeshByCurve(mesh, curve, point_ref, return_unselected=False, mesh_vtk=Non
             dtype=mesh.node.dtype
         else:
             raise ValueError('dtype is unknown')
-    curve_vtk = vtk.vtkPoints()
+    curve_vtk=vtk.vtkPoints()
     curve_vtk.SetDataTypeToDouble()
     curve_vtk.SetNumberOfPoints(len(curve))
     for n in range(0, len(curve)):
@@ -250,10 +250,7 @@ def CutMeshByCurve(mesh, curve, point_ref, return_unselected=False, mesh_vtk=Non
     selecter.SetSelectionModeToClosestPointRegion()
     selecter.SetClosestPoint(float(point_ref[0]), float(point_ref[1]), float(point_ref[2]))
     selecter.SetGenerateSelectionScalars(0)
-    if return_unselected == True:
-        selecter.SetGenerateUnselectedOutput(1)
-    else:
-        selecter.SetGenerateUnselectedOutput(0)
+    selecter.SetGenerateUnselectedOutput(return_unselected)
     selecter.Update()
     output_mesh=PolygonMesh()
     output_mesh.read_mesh_vtk(selecter.GetOutput(), dtype)
@@ -264,7 +261,6 @@ def CutMeshByCurve(mesh, curve, point_ref, return_unselected=False, mesh_vtk=Non
     return output_mesh, output_mesh_other
 #%%
 def ProjectPointToMesh(mesh, point, mesh_vtk=None, dtype=None):
-    #ProjectPointToFaceByVTKCellLocator in MDK
     #point (N, 3)
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -284,14 +280,13 @@ def ProjectPointToMesh(mesh, point, mesh_vtk=None, dtype=None):
     else:
         raise ValueError('point can only be torch.tensor or np.ndarray')
     #------------------------------------------
-    #CellLocator = vtk.vtkCellLocator()
-    CellLocator = vtk.vtkStaticCellLocator()
+    CellLocator=vtk.vtkStaticCellLocator()
     CellLocator.SetDataSet(mesh_vtk)
     CellLocator.BuildLocator()
     point_proj=[]
     element_proj=[]
     for k in range(0, len(point)):
-        testPoint = [float(point[k][0]), float(point[k][1]), float(point[k][2])]
+        testPoint=[float(point[k][0]), float(point[k][1]), float(point[k][2])]
         closestPoint=[0, 0, 0] #the coordinates of the closest point will be returned here
         closestPointDist2=vtk.reference(0) #the squared distance to the closest point will be returned here
         cellId=vtk.reference(0); #the cell id of the cell containing the closest point will be returned here
@@ -329,10 +324,11 @@ def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None, dtype=None):
     trifilter.SetInputData(mesh_vtk)
     trifilter.Update()
     output_mesh=TriangleMesh()
-    output_mesh.read_mesh_vtk(trifilter.GetOutput(), dtype=dtype)
+    output_mesh.read_mesh_vtk(trifilter.GetOutput(), dtype)
     return output_mesh
 #%%
-def ClipMeshByPlane(mesh, origin, normal, return_clipped_output=False, eps=1e-5, mesh_vtk=None, dtype=None):
+def ClipMeshByPlane(mesh, origin, normal, return_clipped_output=False, clean_output=False, eps=1e-5,
+                    triangulate_output=False, mesh_vtk=None, dtype=None):
     #origin and normal define the cut plane
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -351,26 +347,42 @@ def ClipMeshByPlane(mesh, origin, normal, return_clipped_output=False, eps=1e-5,
     if return_clipped_output == True:
         clipper.GenerateClippedOutputOn()
     clipper.Update()
-    #cleaner=vtk.vtkCleanPolyData()
-    cleaner=vtk.vtkStaticCleanPolyData()
-    cleaner.SetInputData(clipper.GetOutput())
-    cleaner.ToleranceIsAbsoluteOn()
-    cleaner.SetAbsoluteTolerance(eps)
-    cleaner.Update()
-    output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput(), dtype)
+    output_vtk=clipper.GetOutput()
+    if clean_output == True:
+        cleaner=vtk.vtkStaticCleanPolyData()
+        cleaner.SetInputData(output_vtk)
+        cleaner.ToleranceIsAbsoluteOn()
+        cleaner.SetAbsoluteTolerance(eps)
+        cleaner.RemoveUnusedPointsOn()
+        cleaner.Update()
+        output_vtk=cleaner.GetOutput()
+    if triangulate_output == False:
+        output_mesh=PolygonMesh()
+        output_mesh.read_mesh_vtk(output_vtk, dtype)
+    else:
+        output_mesh=ConvertPolygonMeshToTriangleMesh(None, output_vtk, dtype)
     if return_clipped_output == False:
         return output_mesh
     #----------------------------------------
-    cleaner=vtk.vtkStaticCleanPolyData()
-    cleaner.SetInputData(clipper.GetClippedOutput())
-    cleaner.ToleranceIsAbsoluteOn()
-    cleaner.SetAbsoluteTolerance(eps)
-    cleaner.Update()
-    clipped_output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput(), dtype)
+    clipped_output_vtk=clipper.GetClippedOutput()
+    if clean_output == True:
+        cleaner=vtk.vtkStaticCleanPolyData()
+        cleaner.SetInputData(clipped_output_vtk)
+        cleaner.ToleranceIsAbsoluteOn()
+        cleaner.SetAbsoluteTolerance(eps)
+        cleaner.RemoveUnusedPointsOn()
+        cleaner.Update()
+        clipped_output_vtk=cleaner.GetOutput()
+    if triangulate_output == False:
+        clipped_output_mesh=PolygonMesh()
+        clipped_output_mesh.read_mesh_vtk(clipped_output_vtk, dtype)
+    else:
+        clipped_output_mesh=ConvertPolygonMeshToTriangleMesh(None, clipped_output_vtk, dtype)
     return output_mesh, clipped_output_mesh
 #%%
 def ClipMeshByAttribute(mesh, attribute_threshold, node_attribute_name=None, element_attribute_name=None,
-                        invert=True, return_clipped_output=False, eps=1e-5, mesh_vtk=None, dtype=None):
+                        invert=True, return_clipped_output=False, clean_output=False, eps=1e-5,
+                        triangulate_output=False, mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     if dtype is None:
@@ -399,24 +411,40 @@ def ClipMeshByAttribute(mesh, attribute_threshold, node_attribute_name=None, ele
     if return_clipped_output == True:
         clipper.GenerateClippedOutputOn()
     clipper.Update()
-    cleaner=vtk.vtkStaticCleanPolyData()
-    cleaner.SetInputData(clipper.GetOutput())
-    cleaner.ToleranceIsAbsoluteOn()
-    cleaner.SetAbsoluteTolerance(eps)
-    cleaner.Update()
-    output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput(), dtype)    
+    output_vtk=clipper.GetOutput()
+    if clean_output == True:
+        cleaner=vtk.vtkStaticCleanPolyData()
+        cleaner.SetInputData(output_vtk)
+        cleaner.ToleranceIsAbsoluteOn()
+        cleaner.SetAbsoluteTolerance(eps)
+        cleaner.RemoveUnusedPointsOn()
+        cleaner.Update()
+        output_vtk=cleaner.GetOutput()
+    if triangulate_output == False:
+        output_mesh=PolygonMesh()
+        output_mesh.read_mesh_vtk(output_vtk, dtype)
+    else:
+        output_mesh=ConvertPolygonMeshToTriangleMesh(None, output_vtk, dtype)
     if return_clipped_output == False:
         return output_mesh
     #----------------------------------------
-    cleaner=vtk.vtkStaticCleanPolyData()
-    cleaner.SetInputData(clipper.GetClippedOutput())
-    cleaner.ToleranceIsAbsoluteOn()
-    cleaner.SetAbsoluteTolerance(eps)
-    cleaner.Update()
-    clipped_output_mesh=ConvertPolygonMeshToTriangleMesh(None, cleaner.GetOutput(), dtype)
+    clipped_output_vtk=clipper.GetClippedOutput()
+    if clean_output == True:
+        cleaner=vtk.vtkStaticCleanPolyData()
+        cleaner.SetInputData(clipped_output_vtk)
+        cleaner.ToleranceIsAbsoluteOn()
+        cleaner.SetAbsoluteTolerance(eps)
+        cleaner.RemoveUnusedPointsOn()
+        cleaner.Update()
+        clipped_output_vtk=cleaner.GetOutput()
+    if triangulate_output == False:
+        clipped_output_mesh=PolygonMesh()
+        clipped_output_mesh.read_mesh_vtk(clipped_output_vtk, dtype)
+    else:
+        clipped_output_mesh=ConvertPolygonMeshToTriangleMesh(None, clipped_output_vtk, dtype)
     return output_mesh, clipped_output_mesh
 #%%
-def SliceMeshByPlane(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
+def SliceMeshByPlane(mesh, origin, normal, clean_output=False, eps=1e-5, mesh_vtk=None, dtype=None):
     #similar to slice function in paraview
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -428,13 +456,28 @@ def SliceMeshByPlane(mesh, origin, normal, eps=1e-5, mesh_vtk=None, dtype=None):
     plane=vtk.vtkPlane()
     plane.SetOrigin(float(origin[0]), float(origin[1]), float(origin[2]))
     plane.SetNormal(float(normal[0]), float(normal[1]), float(normal[2]))
-    slicer=vtk.vtkPolyDataPlaneCutter()
+    if mesh is not None:
+        if mesh.is_tri() == True:
+            slicer=vtk.vtkPolyDataPlaneCutter()
+        else:
+            slicer=vtk.vtkPlaneCutter()
+    else:
+        slicer=vtk.vtkPlaneCutter()
     slicer.SetInputData(mesh_vtk)
     slicer.SetPlane(plane)
-    slicer.Update()    
+    slicer.Update()
+    output_vtk=slicer.GetOutput()
+    if clean_output == True:
+        cleaner=vtk.vtkStaticCleanPolyData()
+        cleaner.SetInputData(output_vtk)
+        cleaner.ToleranceIsAbsoluteOn()
+        cleaner.SetAbsoluteTolerance(eps)
+        cleaner.RemoveUnusedPointsOn()
+        cleaner.Update()
+        output_vtk=cleaner.GetOutput()
     output_mesh=PolylineMesh()
-    output_mesh.read_mesh_vtk(slicer.GetOutput(), dtype=dtype)    
-    return output_mesh   
+    output_mesh.read_mesh_vtk(output_vtk, dtype=dtype)
+    return output_mesh
 #%%
 def ComputeCurvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
@@ -470,7 +513,8 @@ def ComputeCurvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
         curvature[i]=data.GetComponent(i,0)
     return curvature
 #%%
-def FillHole(mesh, hole_size, mesh_vtk=None, dtype=None):
+def FillHole(mesh, hole_size, clean_output=False, eps=1e-5, triangulate_output=False, mesh_vtk=None, dtype=None):
+    #make a watertight mesh
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     if dtype is None:
@@ -481,14 +525,27 @@ def FillHole(mesh, hole_size, mesh_vtk=None, dtype=None):
     filter=vtk.vtkFillHolesFilter()
     filter.SetInputData(mesh_vtk)
     filter.SetHoleSize(hole_size)
-    filter.Update()    
+    filter.Update()
+    output_vtk=filter.GetOutput()
+    if clean_output == True:
+        cleaner=vtk.vtkStaticCleanPolyData()
+        cleaner.SetInputData(output_vtk)
+        cleaner.ToleranceIsAbsoluteOn()
+        cleaner.SetAbsoluteTolerance(eps)
+        cleaner.RemoveUnusedPointsOn()
+        cleaner.Update()
+        output_vtk=cleaner.GetOutput()
     normals = vtk.vtkPolyDataNormals()
-    normals.SetInputData(filter.GetOutput())
+    normals.SetInputData(output_vtk)
     normals.ConsistencyOn()
     normals.SplittingOff()
     normals.Update()    
-    mesh_vtk_new=normals.GetOutput()
-    output_mesh=ConvertPolygonMeshToTriangleMesh(None, mesh_vtk_new, dtype)
+    output_vtk=normals.GetOutput()
+    if triangulate_output == False:
+        output_mesh=PolygonMesh()
+        output_mesh.read_mesh_vtk(output_vtk, dtype)
+    else:
+        output_mesh=ConvertPolygonMeshToTriangleMesh(None, output_vtk, dtype)
     return output_mesh
 #%%
 def FindDijkstraGraphGeodesicPath(mesh, start_node_idx, end_node_idx, mesh_vtk=None, dtype=None):
@@ -515,6 +572,3 @@ def FindDijkstraGraphGeodesicPath(mesh, start_node_idx, end_node_idx, mesh_vtk=N
         path[n,2]=p[2]
     node_idx_list=FindNearestNode(mesh, path)    
     return node_idx_list
-#%%
-
-    

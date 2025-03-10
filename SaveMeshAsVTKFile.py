@@ -117,7 +117,6 @@ def save_polygon_mesh_to_vtk(mesh, filename):
     #------------------------------------------------------------------
     with open(filename, 'w', encoding = 'utf-8') as file:
         file.writelines(out)
-
 #%%
 def save_polyhedron_mesh_to_vtk(mesh, filename):
     out=[]

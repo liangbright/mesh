@@ -76,73 +76,56 @@ class PolylineMesh(Mesh):
     
     def find_boundary_node(self):
         #return index list of nodes on boundary
-        if self.edge is None:
-            self.build_edge()
-        if self.edge_to_element_adj_table is None:
-            self.build_edge_to_element_adj_table()
-        edge=self.edge.detach().cpu().numpy()
+        #a boundary node has no more than one neighbor node
+        if self.node_to_node_adj_table is None:
+            self.build_node_to_node_adj_table()
         boundary=[]
-        for k in range(0, len(edge)):
-            adj_elm_idx=self.edge_to_element_adj_table[k]
-            if len(adj_elm_idx) == 1:
-                boundary.append(edge[k,0])
-                boundary.append(edge[k,1])
-        boundary=np.unique(boundary).tolist()
+        for k in range(0, len(self.node)):
+            adj_node_idx=self.node_to_node_adj_table[k]
+            if len(adj_node_idx) <= 1:
+                boundary.append(k)
         return boundary
-    
+
     def find_boundary_edge(self):
         if self.edge is None:
             self.build_edge()
-        if self.edge_to_element_adj_table is None:
-            self.build_edge_to_element_adj_table()
-        edge=self.edge.detach().cpu().numpy()
-        boundary=[]
-        for k in range(0, len(edge)):
-            adj_elm_idx=self.edge_to_element_adj_table[k]
-            if len(adj_elm_idx) == 1:
-                boundary.append(k)
-        return boundary
-    
+        boundary_node=self.find_boundary_node()
+        boundary_edge=[]
+        for k in range(0, len(self.edge)):
+            idx0=int(self.edge[k,0])
+            idx1=int(self.edge[k,1])
+            if (idx0 in boundary_node) or (idx1 in boundary_node):
+                boundary_edge.append(k)
+        return boundary_edge
+
     def find_boundary_node_and_edge(self):
         if self.edge is None:
             self.build_edge()
-        if self.edge_to_element_adj_table is None:
-            self.build_edge_to_element_adj_table()
-        edge=self.edge.detach().cpu().numpy()
-        boundary_node=[]
+        boundary_node=self.find_boundary_node()
         boundary_edge=[]
-        for k in range(0, len(edge)):
-            adj_elm_idx=self.edge_to_element_adj_table[k]
-            if len(adj_elm_idx) == 1:
-                boundary_node.append(edge[k,0])
-                boundary_node.append(edge[k,1])
+        for k in range(0, len(self.edge)):
+            idx0=int(self.edge[k,0])
+            idx1=int(self.edge[k,1])
+            if (idx0 in boundary_node) or (idx1 in boundary_node):
                 boundary_edge.append(k)
-        boundary_node=np.unique(boundary_node).tolist()
         return boundary_node, boundary_edge
-    
-    def find_boundary_element(self, adj):
+
+    def find_boundary_element(self):
         #return index list of elements on boundary
-        if adj == "edge":
-            if self.edge is None:
-                self.build_edge()
-            if self.edge_to_element_adj_table is None:
-                self.build_edge_to_element_adj_table()
-            edge=self.edge.detach().cpu().numpy()
-            boundary=[]
-            for k in range(0, len(edge)):
-                adj_elm_idx=self.edge_to_element_adj_table[k]
-                if len(adj_elm_idx) == 1:
-                    boundary.append(adj_elm_idx[0])
-            boundary=np.unique(boundary).tolist()
-            return boundary
-        elif adj == "node":
-            boundary_node=self.find_boundary_node()
-            if self.node_to_element_adj_table is None:
-                self.build_node_to_element_adj_table()
-            boundary=[]
-            for node_idx in boundary_node:
-                adj_elm_idx=self.node_to_element_adj_table[node_idx]
-                boundary.extend(adj_elm_idx)
-            return boundary
+        boundary_node=self.find_boundary_node()
+        if self.node_to_element_adj_table is None:
+            self.build_node_to_element_adj_table()
+        boundary=[]
+        for node_idx in boundary_node:
+            adj_elm_idx=self.node_to_element_adj_table[node_idx]
+            boundary.extend(adj_elm_idx)
+        boundary=np.unique(boundary).tolist()
+        return boundary
+
+    def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
+        new_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
+        new_mesh=PolylineMesh(new_mesh.node, new_mesh.element)
+        if return_node_idx_list == False:
+            return new_mesh
         else:
-            raise ValueError
+            return new_mesh, node_idx_list

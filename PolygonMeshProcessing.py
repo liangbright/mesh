@@ -230,7 +230,8 @@ def SimpleSmootherForQuadMesh(mesh, lamda, mask, n_iters):
 #dtype is a necessary parameter of a function that is based on vtk functions
 # function(mesh, mesh_vtk, dtype) where mesh_vtk is the output of some vtk function and mesh does not exist
 #%%
-def CutMeshByCurve(mesh, curve, point_ref, return_unselected=False, mesh_vtk=None, dtype=None):
+def CutMeshByCurve(mesh, curve, point_ref, straight_cut=False, return_unselected=False, 
+                   clean_output=False, eps=1e-5, triangulate_output=False, mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     if dtype is None:
@@ -248,17 +249,66 @@ def CutMeshByCurve(mesh, curve, point_ref, return_unselected=False, mesh_vtk=Non
     selecter.SetLoop(curve_vtk)
     selecter.SetEdgeSearchModeToDijkstra()
     selecter.SetSelectionModeToClosestPointRegion()
-    selecter.SetClosestPoint(float(point_ref[0]), float(point_ref[1]), float(point_ref[2]))
-    selecter.SetGenerateSelectionScalars(False)
+    selecter.SetClosestPoint(float(point_ref[0]), float(point_ref[1]), float(point_ref[2]))    
+    selecter.SetGenerateSelectionScalars(straight_cut)
     selecter.SetGenerateUnselectedOutput(return_unselected)
     selecter.Update()
-    output_mesh=PolygonMesh()
-    output_mesh.read_mesh_vtk(selecter.GetOutput(), dtype)
+    if straight_cut == False:
+        output_vtk=selecter.GetOutput()
+        if return_unselected == True:
+            unselected_output_vtk=selecter.GetUnselectedOutput()
+    else:
+        clipper=vtk.vtkClipPolyData()
+        clipper.SetInputData(selecter.GetOutput())
+        clipper.SetValue(0)
+        clipper.SetInsideOut(True)
+        if return_unselected == True:
+            clipper.GenerateClippedOutputOn()
+        clipper.Update()
+        #vtkClipPolyData may have weird output: isoloated points not in the selected region
+        #use vtkConnectivityFilter to remove those isoloated points
+        extractor=vtk.vtkConnectivityFilter() 
+        extractor.SetInputData(clipper.GetOutput())
+        extractor.SetExtractionModeToAllRegions()
+        extractor.Update()
+        output_vtk=extractor.GetOutput()        
+        if return_unselected == True:            
+            extractor=vtk.vtkConnectivityFilter()
+            extractor.SetInputData(clipper.GetClippedOutput())
+            extractor.SetExtractionModeToAllRegions()
+            extractor.Update()
+            unselected_output_vtk=extractor.GetOutput()
+    #----------------------------------------
+    if clean_output == True:
+        cleaner=vtk.vtkStaticCleanPolyData()
+        cleaner.SetInputData(output_vtk)
+        cleaner.ToleranceIsAbsoluteOn()
+        cleaner.SetAbsoluteTolerance(eps)
+        cleaner.RemoveUnusedPointsOn()
+        cleaner.Update()
+        output_vtk=cleaner.GetOutput()
+    if triangulate_output == False:
+        output_mesh=PolygonMesh()
+        output_mesh.read_mesh_vtk(output_vtk, dtype)
+    else:
+        output_mesh=ConvertPolygonMeshToTriangleMesh(None, output_vtk, dtype)
     if return_unselected == False:
         return output_mesh
-    output_mesh_other=PolygonMesh()
-    output_mesh_other.read_mesh_vtk(selecter.GetUnselectedOutput(), dtype)
-    return output_mesh, output_mesh_other
+    #----------------------------------------
+    if clean_output == True:
+        cleaner=vtk.vtkStaticCleanPolyData()
+        cleaner.SetInputData(unselected_output_vtk)
+        cleaner.ToleranceIsAbsoluteOn()
+        cleaner.SetAbsoluteTolerance(eps)
+        cleaner.RemoveUnusedPointsOn()
+        cleaner.Update()
+        unselected_output_vtk=cleaner.GetOutput()
+    if triangulate_output == False:
+        unselected_output_mesh=PolygonMesh()
+        unselected_output_mesh.read_mesh_vtk(unselected_output_vtk, dtype)
+    else:
+        unselected_output_mesh=ConvertPolygonMeshToTriangleMesh(None, unselected_output_vtk, dtype)
+    return output_mesh, unselected_output_mesh
 #%%
 def ProjectPointToMesh(mesh, point, mesh_vtk=None, dtype=None):
     #point (N, 3)

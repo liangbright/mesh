@@ -8,7 +8,7 @@ import torch
 from torch.linalg import vector_norm as norm
 import numpy as np
 from copy import deepcopy
-from SaveMeshAsVTKFile import (save_polyline_to_vtk, 
+from SaveMeshAsVTKFile import (save_polyline_mesh_to_vtk, 
                                save_polygon_mesh_to_vtk, 
                                save_polyhedron_mesh_to_vtk)
 import os
@@ -349,7 +349,7 @@ class Mesh:
                 if vtk42 == False:
                     print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False")
             elif 'polyline' in self.mesh_type:
-                save_polyline_to_vtk(self, filename)
+                save_polyline_mesh_to_vtk(self, filename)
             else:
                 raise ValueError('unsupported mesh_type: '+self.mesh_type)
             return

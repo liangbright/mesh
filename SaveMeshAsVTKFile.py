@@ -7,7 +7,7 @@ Created on Sun Jun 26 22:54:53 2022
 
 import torch
 #%%
-def save_polyline_to_vtk(mesh, filename):
+def save_polyline_mesh_to_vtk(mesh, filename):
     element=mesh.element
     node=mesh.node
     node_data=mesh.node_data

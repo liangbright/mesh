@@ -23,12 +23,17 @@ class RodrigueRotationTransform3D(nn.Module):
         R[1,0]=c*sin_t+a*b*(1-cos_t);  R[1,1]=cos_t+b*b*(1-cos_t);   R[1,2]=-a*sin_t+b*c*(1-cos_t)
         R[2,0]=-b*sin_t+a*c*(1-cos_t); R[2,1]=a*sin_t+b*c*(1-cos_t); R[2,2]=cos_t+c*c*(1-cos_t)
         return R
-        
-    def forward(self, x):
+    
+    @staticmethod
+    def rotate(x, axis, angle, origin):
         #x.shape (N,3)
         #axis pass through self.origin
-        R=RodrigueRotationTransform3D.cal_R(self.axis, self.angle)
+        R=RodrigueRotationTransform3D.cal_R(axis, angle)
         R=R.permute(1,0)#transpose
-        y=matmul(x-self.origin, R)+self.origin
+        y=matmul(x-origin, R)+origin
+        return y
+    
+    def forward(self, x):
+        y=RodrigueRotationTransform3D.rotate(x, self.axis, self.angle)
         return y
         

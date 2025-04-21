@@ -254,6 +254,7 @@ def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_
 def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
     #Merge: meshA <= meshB
     #The shared points are in node_idx_listA of meshA and node_idx_listB of meshB
+    #if both node_idx_listA and node_idx_listB are None, simply do meshA + meshB - no point merging    
     #if the distance between two nodes is <= distance_threshold, then merge the two nodes
     if (not isinstance(meshA, Mesh)) or (not isinstance(meshA, Mesh)):
         #raise NotImplementedError

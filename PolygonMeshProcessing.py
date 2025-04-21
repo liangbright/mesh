@@ -6,6 +6,7 @@ Created on Mon Sep 18 20:50:36 2023
 """
 #%%
 import torch
+from torch.linalg import vector_norm as norm
 import torch_scatter
 import numpy as np
 from PolylineMesh import PolylineMesh
@@ -198,7 +199,7 @@ def SimpleSmootherForMeshNodeNormal(mesh, lamda, mask, n_iters, update_node_norm
     adj_link=mesh.node_to_node_adj_link
     for n in range(0, n_iters):
         SimpleSmoother(node_normal, adj_link, lamda, mask, inplace=True)
-        normal_norm=torch.norm(node_normal, p=2, dim=1, keepdim=True)
+        normal_norm=norm(node_normal, ord=2, dim=1, keepdim=True)
         normal_norm=normal_norm.clamp(min=1e-12)
         node_normal=node_normal/normal_norm
     node_normal=node_normal.contiguous()
@@ -622,3 +623,36 @@ def FindDijkstraGraphGeodesicPath(mesh, start_node_idx, end_node_idx, mesh_vtk=N
         path[n,2]=p[2]
     node_idx_list=FindNearestNode(mesh, path)    
     return node_idx_list
+#%%
+def Subdivision(mesh, n_subdivisions, method='linear', mesh_vtk=None, dtype=None):
+    #method: 
+    # linear-> vtkLinearSubdivisionFilter
+    # loop -> vtkLoopSubdivisionFilter
+    # butterfly -> vtkButterflySubdivisionFilter
+    if mesh_vtk is None:
+        mesh_vtk=mesh.convert_to_vtk()
+    if dtype is None:
+        if mesh is not None:
+            dtype=mesh.node.dtype
+        else:
+            raise ValueError('dtype is unknown')
+    
+    trifilter=vtk.vtkTriangleFilter()
+    trifilter.SetInputData(mesh_vtk)
+    trifilter.Update()
+    mesh_vtk=trifilter.GetOutput()
+    
+    if method == 'linear':
+        filter=vtk.vtkLinearSubdivisionFilter()
+    elif method == 'loop':
+        filter=vtk.vtkLoopSubdivisionFilter()
+    elif method == 'butterfly':
+        filter=vtk.vtkButterflySubdivisionFilter()
+    else:
+        raise ValueError
+    filter.SetNumberOfSubdivisions(n_subdivisions)
+    filter.SetInputData(mesh_vtk)
+    filter.update()
+    output_mesh=PolygonMesh()
+    output_mesh.read_mesh_vtk(filter.GetOutput(), dtype)
+    return output_mesh

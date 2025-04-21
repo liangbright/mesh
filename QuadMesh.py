@@ -171,6 +171,8 @@ class QuadMesh(PolygonMesh):
         #bad: gradient is not 0 when it is flat
         #flatness=0.5*((d023*d012).sum(dim=-1)+(d123*d130).sum(dim=-1))
         #good
+        #0.125: flatness is 0.5 when d023 ⊥ d012 and d123 ⊥ d130
+        #0.125: flatness is 0 when d023 = -d012 and d123 = -d130
         flatness=1-0.125*(((d023-d012)**2).sum(dim=-1)+((d123-d130)**2).sum(dim=-1))
         return flatness
     

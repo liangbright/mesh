@@ -31,6 +31,14 @@ def TraceMeshBoundaryCurve(mesh, start_node_idx, next_node_idx=None, end_node_id
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     #---------
+    start_node_idx=int(start_node_idx)
+    if next_node_idx is not None:
+        next_node_idx=int(next_node_idx)
+    if end_node_idx is not None:
+        end_node_idx=int(end_node_idx)
+        if end_node_idx == start_node_idx:
+            raise ValueError("start_node_idx is end_node_idx")
+    #---------
     if mesh.node_to_edge_adj_table is None:
         mesh.build_node_to_edge_adj_table()
     #---------
@@ -232,7 +240,8 @@ def SimpleSmootherForQuadMesh(mesh, lamda, mask, n_iters):
 # function(mesh, mesh_vtk, dtype) where mesh_vtk is the output of some vtk function and mesh does not exist
 #%%
 def CutMeshByCurve(mesh, curve, point_ref, straight_cut=False, return_unselected=False, 
-                   clean_output=False, eps=1e-5, triangulate_output=False, mesh_vtk=None, dtype=None):
+                   clean_output=False, eps=1e-5, triangulate_output=False, mesh_vtk=None, dtype=None,
+                   threshold=0):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     if dtype is None:
@@ -261,7 +270,7 @@ def CutMeshByCurve(mesh, curve, point_ref, straight_cut=False, return_unselected
     else:
         clipper=vtk.vtkClipPolyData()
         clipper.SetInputData(selecter.GetOutput())
-        clipper.SetValue(0)
+        clipper.SetValue(threshold)
         clipper.SetInsideOut(True)
         if return_unselected == True:
             clipper.GenerateClippedOutputOn()

@@ -151,24 +151,21 @@ def SegmentMeshToConnectedRegion(mesh, adj):
 def SimpleSmoother(field, adj_link, lamda, mask, inplace):
     #field.shape (N, ?)
     if mask is None:
-        mask=1
+        mask=1    
+    elif isinstance(mask, list):
+        mask=torch.tensor(mask, dtype=field.dtype, device=field.device)
+        mask=mask.reshape(-1,1)
+    elif isinstance(mask, np.ndarray):
+        mask=torch.tensor(mask, dtype=field.dtype, device=field.device)
+        mask=mask.reshape(-1,1)
+    elif isinstance(mask, torch.Tensor):
+        mask=mask.to(field.dtype).to(field.device)
+        mask=mask.reshape(-1,1)
+    elif isinstance(mask, int) or isinstance(mask, float):
+        if mask != 1:
+            raise ValueError            
     else:
-        if isinstance(mask, list):
-            mask=torch.tensor(mask, dtype=field.dtype, device=field.device)
-            if len(mask.shape)==1:
-                mask=mask.view(-1,1)
-        elif isinstance(mask, np.ndarray):
-            mask=torch.tensor(mask, dtype=field.dtype, device=field.device)
-            if len(mask.shape)==1:
-                mask=mask.view(-1,1)
-        elif isinstance(mask, torch.Tensor):
-            mask=mask.to(field.dtype).to(field.device)
-            if len(mask.shape)==1:
-                mask=mask.view(-1,1)
-        else:
-            raise ValueError('python-object type of mask is not supported')
-        if len(mask.shape)!=2:
-            raise ValueError('len(mask.shape)!=2')
+        raise ValueError('python-object type of mask is not supported')
     #---------
     x_j=field[adj_link[:,0]]
     x_i=field[adj_link[:,1]]
@@ -218,6 +215,10 @@ def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_
     #---------
     start_node_idx=int(start_node_idx)
     next_node_idx=int(next_node_idx)
+    if end_node_idx is not None:
+        end_node_idx=int(end_node_idx)
+        if end_node_idx == start_node_idx:
+            raise ValueError("start_node_idx is end_node_idx")
     #---------
     if mesh.node_to_node_adj_table is None:
         mesh.build_node_to_node_adj_table()

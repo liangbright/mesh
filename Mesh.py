@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
+'''
 Created on Mon May 16 22:07:37 2022
 
 @author: liang
-"""
+'''
 import torch
 from torch.linalg import vector_norm as norm
 import numpy as np
@@ -17,7 +17,7 @@ try:
     import vtk
     _Flag_VTK_IMPORT_=True
 except:
-    print("cannot import vtk")
+    print('cannot import vtk')
 #%%
 class Mesh:
     def __init__(self, node, element, element_type, mesh_type):
@@ -26,7 +26,7 @@ class Mesh:
             and ('polyline' not in mesh_type)):
             raise ValueError('unknown mesh_type: '+mesh_type)
         #--------------------------------------------------------------------
-        self.name="" # name of the mesh
+        self.name='' # name of the mesh
         self.mesh_type=mesh_type
         self.node=[] #Nx3
         self.element=[] #[e_1,...e_M], e1 is a list of node indexes in e1
@@ -51,7 +51,7 @@ class Mesh:
                 else:
                     self.node=torch.tensor(node, dtype=torch.float32)
             else:
-                raise ValueError("unsupported python-object type of node")
+                raise ValueError('unsupported python-object type of node')
         #--------------------------------------------------------------------
         if element is not None:
             if torch.is_tensor(element):
@@ -67,7 +67,7 @@ class Mesh:
                 except:
                     self.element=element
             else:
-                raise ValueError("unsupported python-object type of element")
+                raise ValueError('unsupported python-object type of element')
         #--------------------------------------------------------------------
         if element_type is not None:
             if isinstance(element_type, np.ndarray):
@@ -77,7 +77,7 @@ class Mesh:
             elif isinstance(element, torch.Tensor):
                   element_type=element_type.cpu().numpy()
             else:
-                raise ValueError("unsupported python-object type of element_type")
+                raise ValueError('unsupported python-object type of element_type')
             self.element_type=element_type
         #--------------------------------------------------------------------
 
@@ -94,23 +94,23 @@ class Mesh:
         self.edge_to_element_adj_table=None# an edge of an element
         self.element_to_edge_adj_table=None# an edge of an element
         if 'polyline' in self.mesh_type:
-            self.element_to_element_adj_link={"node":None}
-            self.element_to_element_adj_table={"node":None}
+            self.element_to_element_adj_link={'node':None}
+            self.element_to_element_adj_table={'node':None}
         elif 'polygon' in self.mesh_type:
-            self.element_to_element_adj_link={"node":None, "edge":None}
-            self.element_to_element_adj_table={"node":None, "edge":None}
+            self.element_to_element_adj_link={'node':None, 'edge':None}
+            self.element_to_element_adj_table={'node':None, 'edge':None}
         elif 'polyhedron' in self.mesh_type:
             self.face=None
             self.face_to_element_adj_table=None
             self.element_to_face_adj_table=None
-            self.element_to_element_adj_link={"node":None, "edge":None, "face":None}
-            self.element_to_element_adj_table={"node":None, "edge":None, "face":None}
+            self.element_to_element_adj_link={'node':None, 'edge':None, 'face':None}
+            self.element_to_element_adj_table={'node':None, 'edge':None, 'face':None}
 
     def load_from_stl(self, filename, dtype):
         if not os.path.isfile(filename):
-            raise ValueError("not exist: "+filename)
+            raise ValueError('not exist: '+filename)
         if _Flag_VTK_IMPORT_ == False:
-            raise ValueError("vtk is not imported")
+            raise ValueError('vtk is not imported')
         if isinstance(dtype, str):
             if dtype == 'float32':
                 dtype=torch.float32
@@ -129,9 +129,9 @@ class Mesh:
     
     def load_from_vtp(self, filename, dtype):
         if not os.path.isfile(filename):
-            raise ValueError("not exist: "+filename)
+            raise ValueError('not exist: '+filename)
         if _Flag_VTK_IMPORT_ == False:
-            raise ValueError("vtk is not imported")
+            raise ValueError('vtk is not imported')
         if isinstance(dtype, str):
             if dtype == 'float32':
                 dtype=torch.float32
@@ -154,9 +154,9 @@ class Mesh:
     @staticmethod
     def load_vtk_file(filename, mesh_type):
         if not os.path.isfile(filename):
-            raise ValueError("not exist: "+filename)
+            raise ValueError('not exist: '+filename)
         if _Flag_VTK_IMPORT_ == False:
-            raise ValueError("vtk is not imported")        
+            raise ValueError('vtk is not imported')        
         if 'polyhedron' in mesh_type:
             reader = vtk.vtkUnstructuredGridReader()
         elif ('polygon' in mesh_type) or ('polyline' in mesh_type):
@@ -275,7 +275,7 @@ class Mesh:
 
     def convert_to_vtk(self):
         if _Flag_VTK_IMPORT_ == False:
-            raise ValueError("vtk is not imported")
+            raise ValueError('vtk is not imported')
         Points_vtk = vtk.vtkPoints()
         Points_vtk.SetDataTypeToDouble()
         Points_vtk.SetNumberOfPoints(len(self.node))
@@ -300,7 +300,7 @@ class Mesh:
         for name, data in self.node_data.items():
             #data should be a 2D array (self.node.shape[0], ?)
             if self.node.shape[0] != data.shape[0]:
-                raise ValueError("self.node.shape[0] != data.shape[0], name:"+name)
+                raise ValueError('self.node.shape[0] != data.shape[0], name:'+name)
             vtk_array=vtk.vtkDoubleArray()
             #run SetNumberOfComponents before SetNumberOfTuples
             vtk_array.SetNumberOfComponents(data.shape[1])
@@ -314,7 +314,7 @@ class Mesh:
         for name, data in self.element_data.items():
             #data should be a 2D array (len(self.element), ?)
             if len(self.element) != data.shape[0]:
-                raise ValueError("len(self.element) != data.shape[0], name:"+name)
+                raise ValueError('len(self.element) != data.shape[0], name:'+name)
             vtk_array=vtk.vtkDoubleArray()
             vtk_array.SetNumberOfComponents(data.shape[1])
             vtk_array.SetNumberOfTuples(data.shape[0])
@@ -343,11 +343,11 @@ class Mesh:
             if 'polyhedron' in self.mesh_type:
                 save_polyhedron_mesh_to_vtk(self, filename)
                 if vtk42 == False:
-                    print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False")
+                    print('Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False')
             elif 'polygon' in self.mesh_type:
                 save_polygon_mesh_to_vtk(self, filename)
                 if vtk42 == False:
-                    print("Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False")
+                    print('Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False')
             elif 'polyline' in self.mesh_type:
                 save_polyline_mesh_to_vtk(self, filename)
             else:
@@ -393,85 +393,85 @@ class Mesh:
         writer.Write()        
 
     def save_as_torch(self, filename, save_adj_info=True):
-        data={"mesh_type":self.mesh_type,
-              "node":self.node,
-              "element":self.element,
-              "node_set":self.node_set,
-              "element_set":self.element_set,
-              "node_data":self.node_data,
-              "element_data":self.element_data,
-              "mesh_data":self.mesh_data,
-              "mapping_from_node_name_to_index":self.mapping_from_node_name_to_index}
+        data={'mesh_type':self.mesh_type,
+              'node':self.node,
+              'element':self.element,
+              'node_set':self.node_set,
+              'element_set':self.element_set,
+              'node_data':self.node_data,
+              'element_data':self.element_data,
+              'mesh_data':self.mesh_data,
+              'mapping_from_node_name_to_index':self.mapping_from_node_name_to_index}
         if save_adj_info == True:
-            data["edge"]=self.edge
-            data["node_to_node_adj_link"]=self.node_to_node_adj_link
-            data["node_to_node_adj_table"]=self.node_to_node_adj_table
-            data["node_to_edge_adj_table"]=self.node_to_edge_adj_table
-            data["node_to_element_adj_table"]=self.node_to_element_adj_table
-            data["edge_to_edge_adj_table"]=self.edge_to_edge_adj_table
-            data["edge_to_element_adj_table"]=self.edge_to_element_adj_table            
-            data["element_to_element_adj_link"]=self.element_to_element_adj_link
-            data["element_to_element_adj_table"]=self.element_to_element_adj_table
-            data["element_to_edge_adj_table"]=self.element_to_edge_adj_table
+            data['edge']=self.edge
+            data['node_to_node_adj_link']=self.node_to_node_adj_link
+            data['node_to_node_adj_table']=self.node_to_node_adj_table
+            data['node_to_edge_adj_table']=self.node_to_edge_adj_table
+            data['node_to_element_adj_table']=self.node_to_element_adj_table
+            data['edge_to_edge_adj_table']=self.edge_to_edge_adj_table
+            data['edge_to_element_adj_table']=self.edge_to_element_adj_table            
+            data['element_to_element_adj_link']=self.element_to_element_adj_link
+            data['element_to_element_adj_table']=self.element_to_element_adj_table
+            data['element_to_edge_adj_table']=self.element_to_edge_adj_table
             if 'polyhedron' in self.mesh_type:
-                data["face"]=self.face
-                data["face_to_element_adj_table"]=self.face_to_element_adj_table
-                data["element_to_face_adj_table"]=self.element_to_face_adj_table
+                data['face']=self.face
+                data['face_to_element_adj_table']=self.face_to_element_adj_table
+                data['element_to_face_adj_table']=self.element_to_face_adj_table
         torch.save(data,  filename)
 
     def load_from_torch(self, filename):
         if not os.path.isfile(filename):
-            raise ValueError("not exist: "+filename)
-        data=torch.load(filename, map_location="cpu", weights_only=False)
-        if "node" in data.keys():
-            self.node=data["node"]
+            raise ValueError('not exist: '+filename)
+        data=torch.load(filename, map_location='cpu', weights_only=False)
+        if 'node' in data.keys():
+            self.node=data['node']
             if not isinstance(self.node, torch.Tensor):
                 self.node=torch.tensor(self.node)
         else:
-            raise ValueError("node is not in data.keys()")
-        if "element" in data.keys():
-            self.element=data["element"]
+            raise ValueError('node is not in data.keys()')
+        if 'element' in data.keys():
+            self.element=data['element']
         else:
-            raise ValueError("element is not in data.keys()")
-        if "node_set" in data.keys():
-            self.node_set=data["node_set"]
-        if "element_set" in data.keys():
-            self.element_set=data["element_set"]
-        if "node_data" in data.keys():
-            self.node_data=data["node_data"]
-        if "element_data" in data.keys():
-            self.element_data=data["element_data"]
-        if "mesh_data" in data.keys():
-            self.mesh_data=data["mesh_data"]
-        if "mapping_from_node_name_to_index" in data.keys():
-            self.mapping_from_node_name_to_index=data["mapping_from_node_name_to_index"]
-        if "edge" in data.keys():
-            self.edge=data["edge"]
-        if "node_to_node_adj_link" in data.keys():
-            self.node_to_node_adj_link=data["node_to_node_adj_link"]
-        if "node_to_node_adj_table" in data.keys():
-            self.node_to_node_adj_table=data["node_to_node_adj_table"]
-        if "node_to_edge_adj_table" in data.keys():
-            self.node_to_edge_adj_table=data["node_to_edge_adj_table"]
-        if "node_to_element_adj_table" in data.keys():
-            self.node_to_element_adj_table=data["node_to_element_adj_table"]
-        if "edge_to_edge_adj_table" in data.keys():
-            self.edge_to_edge_adj_table=data["edge_to_edge_adj_table"]
-        if "edge_to_element_adj_table" in data.keys():
-            self.edge_to_element_adj_table=data["edge_to_element_adj_table"]
-        if "element_to_element_adj_link" in data.keys():
-            self.element_to_element_adj_link=data["element_to_element_adj_link"]
-        if "element_to_element_adj_table" in data.keys():
-            self.element_to_element_adj_table=data["element_to_element_adj_table"]
-        if "element_to_edge_adj_table" in data.keys():
-            self.element_to_edge_adj_table=data["element_to_edge_adj_table"]
+            raise ValueError('element is not in data.keys()')
+        if 'node_set' in data.keys():
+            self.node_set=data['node_set']
+        if 'element_set' in data.keys():
+            self.element_set=data['element_set']
+        if 'node_data' in data.keys():
+            self.node_data=data['node_data']
+        if 'element_data' in data.keys():
+            self.element_data=data['element_data']
+        if 'mesh_data' in data.keys():
+            self.mesh_data=data['mesh_data']
+        if 'mapping_from_node_name_to_index' in data.keys():
+            self.mapping_from_node_name_to_index=data['mapping_from_node_name_to_index']
+        if 'edge' in data.keys():
+            self.edge=data['edge']
+        if 'node_to_node_adj_link' in data.keys():
+            self.node_to_node_adj_link=data['node_to_node_adj_link']
+        if 'node_to_node_adj_table' in data.keys():
+            self.node_to_node_adj_table=data['node_to_node_adj_table']
+        if 'node_to_edge_adj_table' in data.keys():
+            self.node_to_edge_adj_table=data['node_to_edge_adj_table']
+        if 'node_to_element_adj_table' in data.keys():
+            self.node_to_element_adj_table=data['node_to_element_adj_table']
+        if 'edge_to_edge_adj_table' in data.keys():
+            self.edge_to_edge_adj_table=data['edge_to_edge_adj_table']
+        if 'edge_to_element_adj_table' in data.keys():
+            self.edge_to_element_adj_table=data['edge_to_element_adj_table']
+        if 'element_to_element_adj_link' in data.keys():
+            self.element_to_element_adj_link=data['element_to_element_adj_link']
+        if 'element_to_element_adj_table' in data.keys():
+            self.element_to_element_adj_table=data['element_to_element_adj_table']
+        if 'element_to_edge_adj_table' in data.keys():
+            self.element_to_edge_adj_table=data['element_to_edge_adj_table']
         if 'polyhedron' in self.mesh_type:
-            if "face" in data.keys():
-                self.face=data["face"]
-            if "face_to_element_adj_table" in data.keys():
-                self.face_to_element_adj_table=data["face_to_element_adj_table"]
-            if "element_to_face_adj_table" in data.keys():
-                self.element_to_face_adj_table=data["element_to_face_adj_table"]
+            if 'face' in data.keys():
+                self.face=data['face']
+            if 'face_to_element_adj_table' in data.keys():
+                self.face_to_element_adj_table=data['face_to_element_adj_table']
+            if 'element_to_face_adj_table' in data.keys():
+                self.element_to_face_adj_table=data['element_to_face_adj_table']
 
     def copy(self, node, element, dtype=None, detach=True):
         if isinstance(node, torch.Tensor):
@@ -555,7 +555,7 @@ class Mesh:
             self.mapping_from_node_name_to_index[name]=idx
         else:
             if name in self.mapping_from_node_name_to_index.keys():
-                raise ValueError("node "+str(idx)+" already has a name:"+str(name))
+                raise ValueError('node '+str(idx)+' already has a name:'+str(name))
             else:
                 self.mapping_from_node_name_to_index[name]=idx
     
@@ -580,7 +580,7 @@ class Mesh:
         elif len(temp) == 1:
             edge_idx=int(temp.item())
         else:
-            raise ValueError("more than one edge between node "+str(nodeA_idx)+" and node "+str(nodeB_idx))
+            raise ValueError('more than one edge between node '+str(nodeA_idx)+' and node '+str(nodeB_idx))
         return edge_idx
 
     def update_edge_length(self):
@@ -689,7 +689,7 @@ class Mesh:
                     adj_link.append([eid2, eid1])
         adj_link=torch.tensor(adj_link, dtype=torch.int64)
         adj_link=torch.unique(adj_link, dim=0, sorted=True)
-        self.element_to_element_adj_link["node"]=adj_link
+        self.element_to_element_adj_link['node']=adj_link
 
     def build_element_to_element_adj_link_edge(self):
         if self.edge_to_element_adj_table is None:
@@ -704,14 +704,14 @@ class Mesh:
                     adj_link.append([eid2, eid1])
         adj_link=torch.tensor(adj_link, dtype=torch.int64)
         adj_link=torch.unique(adj_link, dim=0, sorted=True)
-        self.element_to_element_adj_link["edge"]=adj_link
+        self.element_to_element_adj_link['edge']=adj_link
 
     def build_element_to_element_adj_link_face(self):
         if self.face_to_element_adj_table is None:
             self.build_face_to_element_adj_table()
         adj_link=[]
         for n in range(0, len(self.face_to_element_adj_table)):
-            e_set=self.face_to_element_adj_table["face"][n]
+            e_set=self.face_to_element_adj_table['face'][n]
             for m1 in range(0, len(e_set)):
                 for m2 in range(m1+1, len(e_set)):
                     eid1=e_set[m1]; eid2=e_set[m2]
@@ -719,7 +719,7 @@ class Mesh:
                     adj_link.append([eid2, eid1])
         adj_link=torch.tensor(adj_link, dtype=torch.int64)
         adj_link=torch.unique(adj_link, dim=0, sorted=True)
-        self.element_to_element_adj_link["face"]=adj_link
+        self.element_to_element_adj_link['face']=adj_link
 
     def build_element_to_element_adj_link(self, adj):
         #no self link
@@ -777,17 +777,17 @@ class Mesh:
         else:
             return new_mesh, node_idx_list
 #%%
-if __name__ == "__main__":
+if __name__ == '__main__':
     #%%
-    filename="D:/MLFEA/TAVR/FE/1908788_0_im_5_phase1_Root_solid_three_layers_aligned.vtk"
+    filename='D:/MLFEA/TAVR/FE/1908788_0_im_5_phase1_Root_solid_three_layers_aligned.vtk'
     root1=Mesh('polyhedron')
     root1.load_from_vtk(filename, dtype=torch.float32)
     root1.build_node_to_element_adj_table()
     #%%
-    root1.save_by_vtk("test.vtk")
+    root1.save_by_vtk('test.vtk')
     #%%
     root2=Mesh('polyhedron')
-    root2.load_from_vtk("test.vtk", dtype=torch.float32)
+    root2.load_from_vtk('test.vtk', dtype=torch.float32)
     #%%
     import time
     t1=time.time()

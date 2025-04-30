@@ -14,8 +14,9 @@ from Tet10Mesh import Tet10Mesh
 from copy import deepcopy
 from MeshProcessing import SimpleSmoother, SimpleSmootherForMesh, ComputeAngleBetweenTwoVectorIn3D, TracePolyline, \
                             IsCurveClosed, MergeMesh, FindConnectedRegion, FindNearestNode
+from PolygonMeshProcessing import PolygonMesh, QuadMesh, TriangleMesh                            
 #%%
-def ExtractSurface(mesh):
+def ExtractSurfaceElement(mesh):
     #extract surface and make sure surface normal is from inside to outside
     if ((not isinstance(mesh, TetrahedronMesh)) 
         and (not isinstance(mesh, Tet10Mesh))
@@ -24,7 +25,7 @@ def ExtractSurface(mesh):
         raise NotImplementedError
     face_idx_list=mesh.find_boundary_face()
     adj_table=mesh.face_to_element_adj_table    
-    Surface=[]
+    surface_element=[]
     for n in range(0, len(face_idx_list)):
         face_idx=face_idx_list[n]
         fa=mesh.face[face_idx]
@@ -61,6 +62,20 @@ def ExtractSurface(mesh):
         face=np.array(face, dtype=np.int64)
         face_sorted=np.sort(face, axis=1)
         best_idx=np.abs((face_sorted-fa)).sum(axis=1).argmin().item()
-        Surface.append(face[best_idx].tolist())
-    return Surface
-            
+        surface_element.append(face[best_idx].tolist())
+    return surface_element
+#%%
+def ExtractSurfaceMesh(mesh):
+    surface_element=ExtractSurfaceElement(mesh)
+    try:
+        surface_element=torch.tensor(surface_element, dtype=torch.int64)
+        if surface_element.shape[1] == 3:
+            temp_mesh=TriangleMesh(mesh.node, surface_element)
+        elif surface_element.shape[1] == 4:
+            temp_mesh=QuadMesh(mesh.node, surface_element)
+        else:
+            temp_mesh=PolygonMesh(mesh.node, surface_element)
+    except:
+        temp_mesh=PolygonMesh(mesh.node, surface_element)
+    surface_mesh=temp_mesh.get_sub_mesh(torch.arange(0, len(surface_element)).tolist())
+    return surface_mesh

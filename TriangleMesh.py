@@ -103,9 +103,14 @@ class TriangleMesh(PolygonMesh):
     def sample_points(node, element, n_points):
         area, normal=TriangleMesh.cal_element_area_and_normal(node, element)
         prob = area / area.sum()
-        sample = torch.multinomial(prob.view(-1), n_points-len(element), replacement=True)
-        #print("sample_points", area.shape, prob.shape, sample.shape)
-        element = torch.cat([element, element[sample]], dim=0)
+        if n_points > len(element):
+            sample = torch.multinomial(prob.view(-1), n_points-len(element), replacement=True)
+            #print("sample_points", area.shape, prob.shape, sample.shape)
+            element = torch.cat([element, element[sample]], dim=0)
+        else:
+            sample = torch.multinomial(prob.view(-1), n_points, replacement=True)
+            #print("sample_points", area.shape, prob.shape, sample.shape)
+            element = element[sample]
         a = torch.rand(2, n_points, 1, dtype=node.dtype, device=node.device)
         x0=node[element[:,0]]
         x1=node[element[:,1]]

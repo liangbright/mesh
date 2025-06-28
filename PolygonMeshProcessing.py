@@ -213,6 +213,23 @@ def SimpleSmootherForMeshNodeNormal(mesh, lamda, mask, n_iters, update_node_norm
     node_normal=node_normal.contiguous()
     mesh.node_normal=node_normal
 #%%
+def SimpleSmootherForMeshElementNormal(mesh, lamda, mask, n_iters, update_element_normal=True):
+    if not isinstance(mesh, PolygonMesh):
+        raise NotImplementedError
+    if update_element_normal == True:
+        mesh.update_element_area_and_normal()
+    element_normal =mesh.element_normal 
+    if mesh.element_to_element_adj_link['node'] is None:
+        mesh.build_element_to_element_adj_link('node')
+    adj_link=mesh.element_to_element_adj_link['node']
+    for n in range(0, n_iters):
+        SimpleSmoother(element_normal, adj_link, lamda, mask, inplace=True)
+        normal_norm=norm(element_normal, ord=2, dim=1, keepdim=True)
+        normal_norm=normal_norm.clamp(min=1e-12)
+        element_normal=element_normal/normal_norm
+    element_normal=element_normal.contiguous()
+    mesh.element_normal=element_normal    
+#%%
 def SimpleSmootherForQuadMesh(mesh, lamda, mask, n_iters):
     if not isinstance(mesh, QuadMesh):
         raise NotImplementedError

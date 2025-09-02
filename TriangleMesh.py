@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar 27 22:24:13 2021
-
-@author: liang
-"""
 import torch
 from torch.linalg import vector_norm as norm
 import torch_scatter
@@ -24,7 +18,7 @@ class TriangleMesh(PolygonMesh):
         if (node is not None) and (element is not None):
             if not self.is_tri():
                 raise ValueError('not a triangle mesh')
-        
+    
     def update_node_normal(self, angle_weighted=True):
         self.element_area, self.element_normal=TriangleMesh.cal_element_area_and_normal(self.node, self.element)
         self.node_normal=TriangleMesh.cal_node_normal(self.node, self.element, angle_weighted, self.element_normal)
@@ -37,15 +31,15 @@ class TriangleMesh(PolygonMesh):
         if element_normal is None:
             element_area, element_normal=TriangleMesh.cal_element_area_and_normal(node, element)
         M=element.shape[0]
-        e_normal=element_normal.view(M, 1, 3)
+        e_normal=element_normal.reshape(M, 1, 3)
         e_normal=e_normal.expand(M, 3, 3)
         e_normal=e_normal.reshape(M*3, 3)
         N=node.shape[0]
         if angle_weighted == True:
             e_angle=TriangleMesh.cal_element_corner_angle(node, element)#e_angle: (M,3)
             weight=e_angle/e_angle.sum(dim=1, keepdim=True)
-            e_normal=e_normal*weight.view(M*3,1)
-        node_normal = torch_scatter.scatter(e_normal, element.view(-1), dim=0, dim_size=N, reduce="sum")        
+            e_normal=e_normal*weight.reshape(M*3,1)
+        node_normal = torch_scatter.scatter(e_normal, element.reshape(-1), dim=0, dim_size=N, reduce="sum")        
         normal_norm=norm(node_normal, ord=2, dim=-1, keepdim=True)
         with torch.no_grad():
             normal_norm.data.clamp_(min=1e-12)        
@@ -93,7 +87,7 @@ class TriangleMesh(PolygonMesh):
         angle0=pmp.ComputeAngleBetweenTwoVectorIn3D(x1-x0, x2-x0, return_cos)
         angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1, return_cos)
         angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x2, x1-x2, return_cos)
-        angle=torch.cat([angle0.view(-1,1), angle1.view(-1,1), angle2.view(-1,1)], dim=1)
+        angle=torch.cat([angle0.reshape(-1,1), angle1.reshape(-1,1), angle2.reshape(-1,1)], dim=1)
         return angle
 
     def sample_points_on_elements(self, n_points):
@@ -104,11 +98,11 @@ class TriangleMesh(PolygonMesh):
         area, normal=TriangleMesh.cal_element_area_and_normal(node, element)
         prob = area / area.sum()
         if n_points > len(element):
-            sample = torch.multinomial(prob.view(-1), n_points-len(element), replacement=True)
+            sample = torch.multinomial(prob.reshape(-1), n_points-len(element), replacement=True)
             #print("sample_points", area.shape, prob.shape, sample.shape)
             element = torch.cat([element, element[sample]], dim=0)
         else:
-            sample = torch.multinomial(prob.view(-1), n_points, replacement=True)
+            sample = torch.multinomial(prob.reshape(-1), n_points, replacement=True)
             #print("sample_points", area.shape, prob.shape, sample.shape)
             element = element[sample]
         a = torch.rand(2, n_points, 1, dtype=node.dtype, device=node.device)
@@ -223,15 +217,12 @@ class TriangleMesh(PolygonMesh):
         return mesh_new
 
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
-        element_sub=self.element[element_idx_list]
-        node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
-        node_new=self.node[node_idx_list]
-        element_new=element_out.view(len(element_idx_list),-1)
-        mesh_new=TriangleMesh(node_new, element_new)
+        sub_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
+        sub_mesh=TriangleMesh(sub_mesh.node, sub_mesh.element)
         if return_node_idx_list == False:
-            return mesh_new
+            return sub_mesh
         else:
-            return mesh_new, node_idx_list
+            return sub_mesh, node_idx_list
 #%%
 if __name__ == "__main__":
     #%%

@@ -111,16 +111,12 @@ class HexahedronMesh(PolyhedronMesh):
         pass
 
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
-        #element.shape (M,8)
-        element_sub=self.element[element_idx_list]
-        node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
-        node_out=self.node[node_idx_list]
-        element_out=element_out.view(len(element_idx_list),-1)
-        mesh_new=HexahedronMesh(node_out, element_out)
+        sub_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
+        sub_mesh=HexahedronMesh(sub_mesh.node, sub_mesh.element)
         if return_node_idx_list == False:
-            return mesh_new
+            return sub_mesh
         else:
-            return mesh_new, node_idx_list
+            return sub_mesh, node_idx_list
 #%%
 if __name__ == "__main__":
     pass

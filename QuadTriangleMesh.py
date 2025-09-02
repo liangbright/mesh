@@ -1,12 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar 27 22:24:13 2021
-
-@author: liang
-"""
 import numpy as np
 import torch
-from torch_sparse import SparseTensor
 from PolygonMesh import PolygonMesh
 from QuadMesh import QuadMesh
 from TriangleMesh import TriangleMesh
@@ -31,20 +24,20 @@ class QuadTriangleMesh(PolygonMesh):
 
     def classify_element(self):
         if isinstance(self.element,  torch.Tensor):
-            #torch does not support mixed size
-            if len(self.element[0]) == 4:
-                self.quad_element=self.element
-                self.quad_element_idx=np.arange(0, len(self.element)).tolist()
-                self.tri_element=[]
-                self.tri_element_idx=[]
-            elif len(self.element[0]) == 3:
-                self.tri_element=self.element
-                self.tri_element_idx=np.arange(0, len(self.element)).tolist()
-                self.quad_element=[]
-                self.quad_element_idx=[]
-            else:
-                raise ValueError("len(self.element[0])="+str(len(self.element[0])))
-            return
+            if len(self.element.shape) == 2: 
+                if len(self.element[0]) == 4:
+                    self.quad_element=self.element
+                    self.quad_element_idx=np.arange(0, len(self.element)).tolist()
+                    self.tri_element=[]
+                    self.tri_element_idx=[]
+                elif len(self.element[0]) == 3:
+                    self.tri_element=self.element
+                    self.tri_element_idx=np.arange(0, len(self.element)).tolist()
+                    self.quad_element=[]
+                    self.quad_element_idx=[]
+                else:
+                    raise ValueError("len(self.element[0])="+str(len(self.element[0])))
+                return
         quad_element=[]
         quad_element_idx=[]
         tri_element=[]
@@ -161,12 +154,7 @@ class QuadTriangleMesh(PolygonMesh):
             node_new=torch.cat([self.node, nodeA, nodeB], dim=0)
         else:
             node_new=torch.cat([self.node, nodeA], dim=0)
-        #adj matrix for nodeA
-        adj=SparseTensor(row=self.edge[:,0],
-                         col=self.edge[:,1],
-                         value=torch.arange(self.node.shape[0],
-                                            self.node.shape[0]+nodeA.shape[0]),
-                         sparse_sizes=(nodeA.shape[0], nodeA.shape[0]))
+
         element_new=[]
         for m in range(0, len(self.quad_element)):
             #-----------
@@ -181,27 +169,16 @@ class QuadTriangleMesh(PolygonMesh):
             id1=int(elm[1])
             id2=int(elm[2])
             id3=int(elm[3])
-            if id0 < id1:
-                id4=adj[id0, id1].to_dense().item()
-            else:
-                id4=adj[id1, id0].to_dense().item()
-            if id1 < id2:
-                id5=adj[id1, id2].to_dense().item()
-            else:
-                id5=adj[id2, id1].to_dense().item()
-            if id2 < id3:
-                id6=adj[id2, id3].to_dense().item()
-            else:
-                id6=adj[id3, id2].to_dense().item()
-            if id3 < id0:
-                id7=adj[id3, id0].to_dense().item()
-            else:
-                id7=adj[id0, id3].to_dense().item()
-            id8=self.node.shape[0]+m
+            id4=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id1)
+            id5=self.node.shape[0]+self.get_edge_idx_from_node_pair(id1, id2)
+            id6=self.node.shape[0]+self.get_edge_idx_from_node_pair(id2, id3)
+            id7=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id3)            
+            id8=self.node.shape[0]+nodeA.shape[0]+m
             element_new.append([id0, id4, id8, id7])
             element_new.append([id4, id1, id5, id8])
             element_new.append([id7, id8, id6, id3])
             element_new.append([id8, id5, id2, id6])
+            
         for m in range(0, len(self.tri_element)):
             #-----------
             #     x2
@@ -213,23 +190,15 @@ class QuadTriangleMesh(PolygonMesh):
             elm=self.tri_element[m]
             id0=int(elm[0])
             id1=int(elm[1])
-            id2=int(elm[2])
-            if id0 < id1:
-                id3=adj[id0, id1].to_dense().item()
-            else:
-                id3=adj[id1, id0].to_dense().item()
-            if id1 < id2:
-                id4=adj[id1, id2].to_dense().item()
-            else:
-                id4=adj[id2, id1].to_dense().item()
-            if id2 < id0:
-                id5=adj[id2, id0].to_dense().item()
-            else:
-                id5=adj[id0, id2].to_dense().item()
+            id2=int(elm[2])            
+            id3=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id1)
+            id4=self.node.shape[0]+self.get_edge_idx_from_node_pair(id1, id2)
+            id5=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id2)    
             element_new.append([id0, id3, id5])
             element_new.append([id3, id4, id5])
             element_new.append([id3, id1, id4])
             element_new.append([id5, id4, id2])
+            
         mesh_new=QuadTriangleMesh(node_new, element_new)
         return mesh_new
 
@@ -262,12 +231,7 @@ class QuadTriangleMesh(PolygonMesh):
             node_new=torch.cat([self.node, nodeA, nodeB], dim=0)
         else: # n_nodeB == 0 and n_nodeC == 0:
             node_new=torch.cat([self.node, nodeA], dim=0)
-        #adj matrix for nodeA
-        adj=SparseTensor(row=self.edge[:,0],
-                         col=self.edge[:,1],
-                         value=torch.arange(self.node.shape[0],
-                                            self.node.shape[0]+nodeA.shape[0]),
-                         sparse_sizes=(nodeA.shape[0], nodeA.shape[0]))
+
         element_new=[]
         for m in range(0, len(self.quad_element)):
             #-----------
@@ -282,27 +246,16 @@ class QuadTriangleMesh(PolygonMesh):
             id1=int(elm[1])
             id2=int(elm[2])
             id3=int(elm[3])
-            if id0 < id1:
-                id4=adj[id0, id1].to_dense().item()
-            else:
-                id4=adj[id1, id0].to_dense().item()
-            if id1 < id2:
-                id5=adj[id1, id2].to_dense().item()
-            else:
-                id5=adj[id2, id1].to_dense().item()
-            if id2 < id3:
-                id6=adj[id2, id3].to_dense().item()
-            else:
-                id6=adj[id3, id2].to_dense().item()
-            if id3 < id0:
-                id7=adj[id3, id0].to_dense().item()
-            else:
-                id7=adj[id0, id3].to_dense().item()
+            id4=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id1)
+            id5=self.node.shape[0]+self.get_edge_idx_from_node_pair(id1, id2)
+            id6=self.node.shape[0]+self.get_edge_idx_from_node_pair(id2, id3)
+            id7=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id3)            
             id8=self.node.shape[0]+nodeA.shape[0]+m
             element_new.append([id0, id4, id8, id7])
             element_new.append([id4, id1, id5, id8])
             element_new.append([id7, id8, id6, id3])
             element_new.append([id8, id5, id2, id6])
+            
         for m in range(0, len(self.tri_element)):
             #-----------
             #     x2
@@ -312,27 +265,19 @@ class QuadTriangleMesh(PolygonMesh):
             #  /  x6  \
             # /   |    \
             #x0---x3---x1
-            #-----------
+            #-----------            
             elm=self.tri_element[m]
             id0=int(elm[0])
             id1=int(elm[1])
             id2=int(elm[2])
-            if id0 < id1:
-                id3=adj[id0, id1].to_dense().item()
-            else:
-                id3=adj[id1, id0].to_dense().item()
-            if id1 < id2:
-                id4=adj[id1, id2].to_dense().item()
-            else:
-                id4=adj[id2, id1].to_dense().item()
-            if id2 < id0:
-                id5=adj[id2, id0].to_dense().item()
-            else:
-                id5=adj[id0, id2].to_dense().item()
+            id3=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id1)
+            id4=self.node.shape[0]+self.get_edge_idx_from_node_pair(id1, id2)
+            id5=self.node.shape[0]+self.get_edge_idx_from_node_pair(id0, id2)
             id6=self.node.shape[0]+nodeA.shape[0]+n_nodeB+m
             element_new.append([id6, id5, id0, id3])
             element_new.append([id6, id3, id1, id4])
             element_new.append([id6, id4, id2, id5])
+            
         mesh_new=QuadTriangleMesh(node_new, element_new)
         return mesh_new
 

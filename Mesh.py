@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-'''
-Created on Mon May 16 22:07:37 2022
-
-@author: liang
-'''
 import torch
 from torch.linalg import vector_norm as norm
 import numpy as np
@@ -52,10 +46,13 @@ class Mesh:
                     self.node=torch.tensor(node, dtype=torch.float32)
             else:
                 raise ValueError('unsupported python-object type of node')
+            
+            if len(self.node.shape) != 2:
+                raise ValueError('invalid self.node.shape')
         #--------------------------------------------------------------------
         if element is not None:
             if torch.is_tensor(element):
-                self.element=element
+                self.element=element.to(torch.int64)
             elif isinstance(element, np.ndarray):
                 try:
                     self.element=torch.tensor(element, dtype=torch.int64)
@@ -68,6 +65,10 @@ class Mesh:
                     self.element=element
             else:
                 raise ValueError('unsupported python-object type of element')
+            
+            if torch.is_tensor(self.element):
+                if len(self.element.shape) != 2:
+                    raise ValueError('invalid self.element.shape')
         #--------------------------------------------------------------------
         if element_type is not None:
             if isinstance(element_type, np.ndarray):
@@ -118,7 +119,7 @@ class Mesh:
                 dtype=torch.float64
             else:
                 raise ValueError('unsupported dtype:'+str(dtype))
-        if 'polygon' in self.mesh_type:
+        if ('polygon' in self.mesh_type) and ('tri6' not in self.mesh_type) and  ('quad8' not in self.mesh_type):
             reader = vtk.vtkSTLReader()
         else:
             raise ValueError('unsupported mesh_type:'+self.mesh_type)
@@ -139,7 +140,7 @@ class Mesh:
                 dtype=torch.float64
             else:
                 raise ValueError('unsupported dtype:'+str(dtype))
-        if 'polygon' in self.mesh_type:
+        if ('polygon' in self.mesh_type) and ('tri6' not in self.mesh_type) and  ('quad8' not in self.mesh_type):
             reader = vtk.vtkXMLPolyDataReader()
         else:
             raise ValueError('unsupported mesh_type:'+self.mesh_type)
@@ -159,7 +160,12 @@ class Mesh:
             raise ValueError('vtk is not imported')        
         if 'polyhedron' in mesh_type:
             reader = vtk.vtkUnstructuredGridReader()
-        elif ('polygon' in mesh_type) or ('polyline' in mesh_type):
+        elif 'polygon' in mesh_type:
+            if ('tri6' in mesh_type) or ('quad8' in mesh_type):
+                reader = vtk.vtkUnstructuredGridReader()
+            else:
+                reader = vtk.vtkPolyDataReader()
+        elif 'polyline' in mesh_type:
             reader = vtk.vtkPolyDataReader()
         else:
             raise ValueError('unsupported mesh_type:'+mesh_type)
@@ -233,19 +239,22 @@ class Mesh:
     @staticmethod
     def get_vtk_cell_type(mesh_type, n_nodes):
         #n_nodes: the number of nodes in an element
+        #assume all elements have the same type
         if 'polyhedron' in mesh_type:
             if n_nodes < 4:
                 raise ValueError('wrong number of nodes')
             elif n_nodes == 4:
                 cell_type=vtk.VTK_TETRA
-            elif n_nodes == 6:
+            elif (n_nodes == 6) and ('wedge6' in mesh_type): 
                 cell_type=vtk.VTK_WEDGE
-            elif n_nodes == 8:
+            elif (n_nodes == 8) and ('hex8' in mesh_type):
                 cell_type=vtk.VTK_HEXAHEDRON
-            elif n_nodes == 10:
+            elif (n_nodes == 10) and ('tet10' in mesh_type):
                 cell_type=vtk.VTK_QUADRATIC_TETRA
             else:
-                cell_type=vtk.VTK_POLYHEDRON
+                #cell_type=vtk.VTK_POLYHEDRON
+                #print('warning: vtk may get stuck when cell_type=vtk.VTK_POLYHEDRON')
+                raise ValueError('not supported: '+str(mesh_type)+' '+str(n_nodes))
         elif 'polygon' in mesh_type:
             if n_nodes < 3:
                 raise ValueError('wrong number of nodes')
@@ -254,7 +263,15 @@ class Mesh:
             elif n_nodes == 4:
                 cell_type=vtk.VTK_QUAD
             elif n_nodes == 6:
-                cell_type=vtk.VTK_QUADRATIC_TRIANGLE
+                if 'tri6' in mesh_type:
+                    cell_type=vtk.VTK_QUADRATIC_TRIANGLE
+                else:
+                    cell_type=vtk.VTK_POLYGON
+            elif n_nodes == 8:
+                if 'quad8' in mesh_type:
+                    cell_type=vtk.VTK_QUADRATIC_QUAD
+                else:
+                    cell_type=vtk.VTK_POLYGON
             else:
                 cell_type=vtk.VTK_POLYGON
         elif 'polyline' in mesh_type:
@@ -270,7 +287,8 @@ class Mesh:
 
     @staticmethod
     def get_vtk_cell_type_from_element_type(element_type):
-        #element_type: tri3, quad4, hex8, etc
+        #element_type: tri3, quad4, hex8, etc in Febio
+        #element_type: C3D8, C3D4, etc in Abaqus 
         raise NotImplementedError
 
     def convert_to_vtk(self):
@@ -283,7 +301,12 @@ class Mesh:
             Points_vtk.SetPoint(n, float(self.node[n,0]), float(self.node[n,1]), float(self.node[n,2]))
         if 'polyhedron' in self.mesh_type:
             mesh_vtk = vtk.vtkUnstructuredGrid()
-        elif ('polygon' in self.mesh_type) or 'polyline' in self.mesh_type:
+        elif 'polygon' in self.mesh_type:
+            if ('tri6' in self.mesh_type) or ('quad8' in self.mesh_type):
+                mesh_vtk = vtk.vtkUnstructuredGrid()
+            else:               
+                mesh_vtk = vtk.vtkPolyData()
+        elif 'polyline' in self.mesh_type:                
             mesh_vtk = vtk.vtkPolyData()
         else:
             raise ValueError('unsupported mesh_type:'+self.mesh_type)
@@ -294,7 +317,7 @@ class Mesh:
             if self.element_type is None:
                 cell_type=Mesh.get_vtk_cell_type(self.mesh_type, len(e))
             else:
-                cell_type=Mesh.translate_element_type_to_vtk_cell_type(self.element_type[n])
+                cell_type=Mesh.get_vtk_cell_type_from_element_type(self.element_type[n])
             mesh_vtk.InsertNextCell(cell_type, len(e), e)
         #--------- convert node_data to PointData --------#
         for name, data in self.node_data.items():
@@ -345,9 +368,12 @@ class Mesh:
                 if vtk42 == False:
                     print('Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False')
             elif 'polygon' in self.mesh_type:
-                save_polygon_mesh_to_vtk(self, filename)
-                if vtk42 == False:
-                    print('Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False')
+                if ('tri6' in self.mesh_type) or ('quad8' in self.mesh_type):
+                    raise ValueError('unsupported mesh_type: '+self.mesh_type)
+                else:
+                    save_polygon_mesh_to_vtk(self, filename)
+                    if vtk42 == False:
+                        print('Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False')
             elif 'polyline' in self.mesh_type:
                 save_polyline_mesh_to_vtk(self, filename)
             else:
@@ -359,7 +385,12 @@ class Mesh:
             return
         if 'polyhedron' in self.mesh_type:
             writer=vtk.vtkUnstructuredGridWriter()
-        elif ('polygon' in self.mesh_type) or ('polyline' in self.mesh_type):
+        elif 'polygon' in self.mesh_type:
+            if ('tri6' in self.mesh_type) or ('quad8' in self.mesh_type):
+                writer=vtk.vtkUnstructuredGridWriter()
+            else:
+                writer=vtk.vtkPolyDataWriter()
+        elif 'polyline' in self.mesh_type:
             writer=vtk.vtkPolyDataWriter()
         else:
             raise ValueError('unsupported mesh_type: '+self.mesh_type)
@@ -384,7 +415,7 @@ class Mesh:
         mesh_vtk=self.convert_to_vtk()
         if mesh_vtk is None:
             return
-        if 'polygon' in self.mesh_type:
+        if ('polygon' in self.mesh_type) and ('tri6' not in self.mesh_type) and  ('quad8' not in self.mesh_type):
             writer=vtk.vtkXMLPolyDataWriter()
         else:
             raise ValueError('unsupported mesh_type: '+self.mesh_type)
@@ -749,25 +780,36 @@ class Mesh:
         self.element_to_element_adj_table[adj]=adj_table
 
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
-        #this function is slow: ony use it if the mesh has different types of elements
-        new_element=[]
-        node_idx_list=[]
-        for m in range(0, len(element_idx_list)):
-            elm=self.element[element_idx_list[m]]
-            elm=self.copy_to_list(elm)
-            new_element.append(elm)
-            node_idx_list.extend(elm)
-        node_idx_list=np.unique(node_idx_list)
-        new_node=self.node[node_idx_list]
-        #map old node idx to new node idx
-        map={}
-        for n in range(0, len(node_idx_list)):
-            old_idx=node_idx_list[n]
-            map[old_idx]=n #n is new_idx
-        for m in range(0, len(new_element)):
-            for n in range(0, len(new_element[m])):
-                old_idx=new_element[m][n]
-                new_element[m][n]=map[old_idx]
+        use_slow_method=True
+        if torch.is_tensor(self.element):
+            if len(self.element.shape) == 2:
+                old_element=self.element[element_idx_list]
+                node_idx_list, new_element=torch.unique(old_element.reshape(-1), return_inverse=True)
+                #node_idx_list[new_element] is old_element.reshape(-1)
+                new_node=self.node[node_idx_list]
+                new_element=new_element.reshape(len(element_idx_list),-1)
+                use_slow_method=False
+        #----------------------------
+        if use_slow_method==True:
+            new_element=[]
+            node_idx_list=[]
+            for m in range(0, len(element_idx_list)):
+                elm=self.element[element_idx_list[m]]
+                elm=self.copy_to_list(elm)
+                new_element.append(elm)
+                node_idx_list.extend(elm)
+            node_idx_list=np.unique(node_idx_list)
+            new_node=self.node[node_idx_list]
+            #map old node idx to new node idx
+            map={}
+            for n in range(0, len(node_idx_list)):
+                old_idx=node_idx_list[n]
+                map[old_idx]=n #n is new_idx
+            for m in range(0, len(new_element)):
+                for n in range(0, len(new_element[m])):
+                    old_idx=new_element[m][n]
+                    new_element[m][n]=map[old_idx]
+        #------------------------------------------------
         new_element_type=None
         if self.element_type is not None:
             new_element_type=self.element_type[element_idx_list]

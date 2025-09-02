@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Sep 18 20:50:36 2023
-
-@author: liang
-"""
-#%%
 import torch
 from torch.linalg import vector_norm as norm
 import torch_scatter
@@ -12,6 +5,7 @@ import numpy as np
 from PolylineMesh import PolylineMesh
 from PolygonMesh import PolygonMesh
 from TriangleMesh import TriangleMesh
+from Tri6Mesh import Tri6Mesh
 from QuadMesh import QuadMesh
 from QuadTriangleMesh import QuadTriangleMesh
 from copy import deepcopy
@@ -148,7 +142,7 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx, max_n
                 if edge_idx not in edge_curve:
                     adj_elm_idx=edge_to_element_adj_table[edge_idx]
                     if len(adj_elm_idx) > 2:
-                        raise ValueError("len(adj_elm_idx) > 2")
+                        raise ValueError("len(adj_elm_idx) > 2 at edge "+str(edge_idx))
                     elif len(adj_elm_idx) == 2:
                         if adj_elm_idx[0] == act_elm_idx:
                             new_active_element_list.append(adj_elm_idx[1])

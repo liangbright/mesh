@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar 27 22:24:13 2021
-
-@author: liang
-"""
 import torch
 import numpy as np
 from copy import deepcopy
@@ -11,6 +5,7 @@ from Mesh import Mesh
 import json
 #%%
 class PolygonMesh(Mesh):
+
     def __init__(self, node=None, element=None):
         super().__init__(node=node, element=element, element_type=None, mesh_type='polygon')
         
@@ -58,6 +53,8 @@ class PolygonMesh(Mesh):
         self.build_element_to_edge_adj_table()
         
     def build_element_to_edge_adj_table(self):
+        if 'tri6' in self.mesh_type:
+            raise ValueError('tri6 node order is not linear')
         element=self.element
         if not isinstance(element, list):
             element=element.tolist()
@@ -76,12 +73,18 @@ class PolygonMesh(Mesh):
         edge=np.array(edge, dtype=np.int64)
         edge_unique, inverse=np.unique(edge, return_inverse=True, axis=0)
         self.edge=torch.tensor(edge_unique, dtype=torch.int64)
-        adj_table=[]
-        idx=0
-        for m in range(0, len(element)):
-            adj_table.append(inverse[idx:(idx+len(element[m]))].tolist())
-            idx=idx+len(element[m])        
-        self.element_to_edge_adj_table=adj_table
+        use_slow_method=True
+        if torch.is_tensor(self.element):
+            if len(self.element.shape) == 2:
+                self.element_to_edge_adj_table=inverse.reshape(-1,self.element.shape[1]).tolist()
+                use_slow_method=False
+        if use_slow_method==True:
+            adj_table=[]
+            idx=0
+            for m in range(0, len(element)):
+                adj_table.append(inverse[idx:(idx+len(element[m]))].tolist())
+                idx=idx+len(element[m])        
+            self.element_to_edge_adj_table=adj_table
 
     def find_boundary_node(self):
         #return index list of nodes on boundary
@@ -208,14 +211,17 @@ class PolygonMesh(Mesh):
         else:
             return False
 
-    def quad_to_tri(self, mode=0):
+    def quad_to_tri(self, mode=0, clone_node=True):
         #divide every quad element to two triangle elements        
         if isinstance(self.element, torch.Tensor):
-            if len(self.element[0]) == 3:                
-                new_mesh=PolygonMesh(self.node.clone(), self.element.clone())
+            if len(self.element[0]) == 3:
+                node=self.node
+                if clone_node == True:
+                    node=node.clone()
+                new_mesh=PolygonMesh(node, self.element.clone())
                 return new_mesh
+        #-------------------------------------------------------    
         element_new=[]
-        m_list=[]
         for m in range(0, len(self.element)):
             elm=self.copy_to_list(self.element[m])
             if len(elm) == 4:
@@ -227,10 +233,7 @@ class PolygonMesh(Mesh):
                 # mode=0: cut along x0-x2
                 # mode=1: cut along x1-x3
                 #-----------
-                id0=int(elm[0])
-                id1=int(elm[1])
-                id2=int(elm[2])
-                id3=int(elm[3])
+                id0, id1, id2, id3=elm
                 if mode == 0:
                     element_new.append([id0, id2, id3])
                     element_new.append([id0, id1, id2])
@@ -248,26 +251,21 @@ class PolygonMesh(Mesh):
                         element_new.append([id1, id2, id3])
                 else:
                     raise ValueError("mode is invalid")
-                m_list.append(3)
-            elif len(elm) == 3:
-                id0=int(elm[0])
-                id1=int(elm[1])
-                id2=int(elm[2])
-                element_new.append([id0, id1, id2])
-                m_list.append(3)
             else:
                 element_new.append(elm)
-                m_list.append(len(elm))   
-        new_mesh=PolygonMesh(self.node.clone(), element_new)   
-        return new_mesh
-
+        node=self.node
+        if clone_node == True:
+            node=node.clone()
+        new_mesh=PolygonMesh(node, element_new)   
+        return new_mesh   
+    
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
-        new_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
-        new_mesh=PolygonMesh(new_mesh.node, new_mesh.element)
+        sub_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
+        sub_mesh=PolygonMesh(sub_mesh.node, sub_mesh.element)
         if return_node_idx_list == False:
-            return new_mesh
+            return sub_mesh
         else:
-            return new_mesh, node_idx_list
+            return sub_mesh, node_idx_list
 #%%
 if __name__ == "__main__":
     filename="D:/MLFEA/TAA/data/bav17_AortaModel_P0_best.pt"

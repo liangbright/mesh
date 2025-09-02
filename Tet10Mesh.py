@@ -1,14 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Feb 22 18:30:52 2024
-
-@author: liang
-"""
-
 import torch
 #import torch_scatter
 import numpy as np
 from torch.linalg import det, cross
+from TetrahedronMesh import TetrahedronMesh
 from PolyhedronMesh import PolyhedronMesh
 #%%
 class Tet10Mesh(PolyhedronMesh):
@@ -16,7 +10,45 @@ class Tet10Mesh(PolyhedronMesh):
     def __init__(self, node=None, element=None):
         super().__init__(node=node, element=element)
         self.mesh_type='polyhedron_tet10'
-
+    
+    def create_from_tet4(self, tet4_mesh):
+        #tet4_mesh: TetrahedronMesh
+        #add a node in the middle of each edge
+        if tet4_mesh.edge is None:
+            tet4_mesh.build_edge()
+        x_j=tet4_mesh.node[tet4_mesh.edge[:,0]]
+        x_i=tet4_mesh.node[tet4_mesh.edge[:,1]]
+        nodeA=(x_j+x_i)/2
+        #create new mesh
+        node_new=torch.cat([tet4_mesh.node, nodeA], dim=0)
+        element=tet4_mesh.element.tolist()
+        element_new=[]
+        for m in range(0, len(element)):
+            #see element.pptx in pytorch-fea document
+            id0=element[m][0]
+            id1=element[m][1]
+            id2=element[m][2]
+            id3=element[m][3]
+            id4=tet4_mesh.node.shape[0]+tet4_mesh.get_edge_idx_from_node_pair(id0, id1)
+            id5=tet4_mesh.node.shape[0]+tet4_mesh.get_edge_idx_from_node_pair(id1, id2)
+            id6=tet4_mesh.node.shape[0]+tet4_mesh.get_edge_idx_from_node_pair(id0, id2)
+            id7=tet4_mesh.node.shape[0]+tet4_mesh.get_edge_idx_from_node_pair(id0, id3)
+            id8=tet4_mesh.node.shape[0]+tet4_mesh.get_edge_idx_from_node_pair(id1, id3)
+            id9=tet4_mesh.node.shape[0]+tet4_mesh.get_edge_idx_from_node_pair(id2, id3)
+            element_new.append([id0, id1, id2, id3, id4, id5, id6, id7, id8, id9])
+        self.__init__(node_new, element_new)
+    
+    def simplify_to_tet4(self, return_node_idx_list=False):        
+        element_out=self.element[:,0:4].clone()
+        node_idx_list, element_out=torch.unique(element_out.reshape(-1), return_inverse=True)
+        node_out=self.node[node_idx_list]
+        element_out=element_out.reshape(-1,4)
+        mesh_new=TetrahedronMesh(node_out, element_out)
+        if return_node_idx_list == False:
+            return mesh_new
+        else:
+            return mesh_new, node_idx_list 
+        
     def build_edge(self):
         self.build_element_to_edge_adj_table()
         
@@ -87,16 +119,12 @@ class Tet10Mesh(PolyhedronMesh):
         pass
 
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
-        #element.shape (M,10)
-        element_sub=self.element[element_idx_list]
-        node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
-        node_out=self.node[node_idx_list]
-        element_out=element_out.view(len(element_idx_list),-1)
-        mesh_new=Tet10Mesh(node_out, element_out)
+        sub_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
+        sub_mesh=Tet10Mesh(sub_mesh.node, sub_mesh.element)
         if return_node_idx_list == False:
-            return mesh_new
+            return sub_mesh
         else:
-            return mesh_new, node_idx_list
+            return sub_mesh, node_idx_list              
 #%%
 if __name__ == "__main__":
     pass

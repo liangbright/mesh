@@ -112,6 +112,8 @@ def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB, return_cos=False):
             return Theta    
         else:
             return CosTheta
+    else:
+        raise ValueError('invalid input')
 #%%
 def FindConnectedRegion(mesh, ref_element_idx, adj):
     if not isinstance(mesh, Mesh):

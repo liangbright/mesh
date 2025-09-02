@@ -1,13 +1,8 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar 27 22:24:13 2021
-
-@author: liang
-"""
 import torch
 from torch.linalg import vector_norm as norm
 from torch.linalg import cross
 import torch_scatter
+import numpy as np
 from PolygonMesh import PolygonMesh
 import PolygonMeshProcessing as pmp
 #%%
@@ -25,7 +20,7 @@ class QuadMesh(PolygonMesh):
         if (node is not None) and (element is not None):
             if not self.is_quad():
                 raise ValueError('not a quad mesh')
-
+     
     def update_node_normal(self, angle_weighted=True):
         self.node_normal=QuadMesh.cal_node_normal(self.node, self.element, angle_weighted=angle_weighted)
         error=torch.isnan(self.node_normal).sum()
@@ -68,15 +63,15 @@ class QuadMesh(PolygonMesh):
 
         M=element.shape[0]
         N=node.shape[0]
-        normal0123=torch.cat([normal0.view(M,1,3),
-                              normal1.view(M,1,3),
-                              normal2.view(M,1,3),
-                              normal3.view(M,1,3)], dim=1)
+        normal0123=torch.cat([normal0.reshape(M,1,3),
+                              normal1.reshape(M,1,3),
+                              normal2.reshape(M,1,3),
+                              normal3.reshape(M,1,3)], dim=1)
         if angle_weighted == True:
             e_angle=QuadMesh.cal_element_corner_angle(node, element)#e_angle: (M,3)
             weight=e_angle/e_angle.sum(dim=1, keepdim=True)
-            normal0123=normal0123*weight.view(M,4,1)
-        normal=torch_scatter.scatter(normal0123.view(-1,3), element.view(-1), dim=0, dim_size=N, reduce="sum")
+            normal0123=normal0123*weight.reshape(M,4,1)
+        normal=torch_scatter.scatter(normal0123.reshape(-1,3), element.reshape(-1), dim=0, dim_size=N, reduce="sum")
         error=torch.isnan(normal).sum()
         if error > 0:
             print("error: nan in normal_quad @ QuadMesh:cal_node_normal")
@@ -127,7 +122,7 @@ class QuadMesh(PolygonMesh):
         angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1, return_cos)
         angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x3-x2, x1-x2, return_cos)
         angle3=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x3, x2-x3, return_cos)
-        angle=torch.cat([angle0.view(-1,1), angle1.view(-1,1), angle2.view(-1,1), angle3.view(-1,1)], dim=1)
+        angle=torch.cat([angle0.reshape(-1,1), angle1.reshape(-1,1), angle2.reshape(-1,1), angle3.reshape(-1,1)], dim=1)
         return angle
     
     def upate_element_flatness(self):
@@ -192,7 +187,7 @@ class QuadMesh(PolygonMesh):
         normal_mean=normal_mean/normal_mean_norm
         normal_mean=normal_mean[element] #(M,4,3)
         diff=((element_normal-normal_mean)**2).sum(dim=2)#(M,4)
-        variance=torch_scatter.scatter(diff.reshape(-1), element.view(-1), dim=0, dim_size=N, reduce="mean")
+        variance=torch_scatter.scatter(diff.reshape(-1), element.reshape(-1), dim=0, dim_size=N, reduce="mean")
         flatness=1-variance               
         return flatness
        
@@ -204,11 +199,11 @@ class QuadMesh(PolygonMesh):
         area, normal=QuadMesh.cal_element_area_and_normal(node, element)
         prob = area / area.sum()
         if n_points > len(element):
-            sample = torch.multinomial(prob.view(-1), n_points-len(element), replacement=True)
+            sample = torch.multinomial(prob.reshape(-1), n_points-len(element), replacement=True)
             #print("sample_points", area.shape, prob.shape, sample.shape)
             element = torch.cat([element, element[sample]], dim=0)
         else:
-            sample = torch.multinomial(prob.view(-1), n_points, replacement=True)
+            sample = torch.multinomial(prob.reshape(-1), n_points, replacement=True)
             #print("sample_points", area.shape, prob.shape, sample.shape)
             element = element[sample]
         a = torch.rand(3, n_points, 1, dtype=node.dtype, device=node.device)
@@ -258,15 +253,12 @@ class QuadMesh(PolygonMesh):
         return mesh_new
 
     def get_sub_mesh(self, element_idx_list, return_node_idx_list=False):
-        element_sub=self.element[element_idx_list]
-        node_idx_list, element_out=torch.unique(element_sub.reshape(-1), return_inverse=True)
-        node_new=self.node[node_idx_list]
-        element_new=element_out.view(len(element_idx_list),-1)
-        mesh_new=QuadMesh(node_new, element_new)
+        sub_mesh, node_idx_list=super().get_sub_mesh(element_idx_list, return_node_idx_list=True)
+        sub_mesh=QuadMesh(sub_mesh.node, sub_mesh.element)
         if return_node_idx_list == False:
-            return mesh_new
+            return sub_mesh
         else:
-            return mesh_new, node_idx_list
+            return sub_mesh, node_idx_list
 #%%
 if __name__ == "__main__":
     #%%

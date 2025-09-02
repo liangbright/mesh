@@ -1,15 +1,9 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar 27 22:24:13 2021
-
-@author: liang
-"""
 import torch
 import numpy as np
 from Mesh import Mesh
 #%%
 class PolyhedronMesh(Mesh):
-    # use this class to handle mixture of tetra and hex elements
+    
     def __init__(self, node=None, element=None, element_type=None):
         super().__init__(node=node, element=element, element_type=element_type, mesh_type='polyhedron')
     

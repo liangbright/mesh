@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Nov  3 00:11:56 2023
-
-@author: liang
-"""
 import torch
 import torch_scatter
 import numpy as np
@@ -18,6 +12,7 @@ from PolygonMeshProcessing import PolygonMesh, QuadMesh, TriangleMesh
 #%%
 def ExtractSurfaceElement(mesh):
     #extract surface and make sure surface normal is from inside to outside
+    #return surface_element: every element is a linear polygon
     if ((not isinstance(mesh, TetrahedronMesh)) 
         and (not isinstance(mesh, Tet10Mesh))
         and (not isinstance(mesh, HexahedronMesh))):
@@ -33,6 +28,8 @@ def ExtractSurfaceElement(mesh):
             fa=fa.tolist()
         fa=np.array([fa], dtype=np.int64)
         fa=np.sort(fa, axis=1)
+        if len(adj_table[face_idx]) != 1:
+            raise ValueError
         elm_idx=adj_table[face_idx][0]
         elm=mesh.element[elm_idx]
         if not isinstance(elm, list):
@@ -49,6 +46,7 @@ def ExtractSurfaceElement(mesh):
             face.append([id0, id6, id2, id5, id1, id4])
             face.append([id0, id4, id1, id8, id3, id7])
             face.append([id0, id7, id3, id9, id2, id6])
+            face.append([id1, id5, id2, id9, id3, id8])
         elif isinstance(mesh, HexahedronMesh):
             id0, id1, id2, id3, id4, id5, id6, id7=elm
             face.append([id0, id3, id2, id1])

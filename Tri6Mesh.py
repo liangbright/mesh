@@ -100,25 +100,15 @@ class Tri6Mesh(PolygonMesh):
             node=node.clone()
         self.__init__(node, element_new)
     
-    def build_element_to_edge_adj_table(self):
-        element=self.element
-        if not isinstance(element, list):
-            element=element.tolist()
-        edge=[]
-        for m in range(0, len(element)):
-            id0, id1, id2, id3, id4, id5=element[m]
-            edge.append([id0, id3])
-            edge.append([id0, id5])
-            edge.append([id1, id3])
-            edge.append([id1, id4])
-            edge.append([id2, id4])
-            edge.append([id2, id5])
-        edge=np.array(edge, dtype=np.int64)
-        edge=np.sort(edge, axis=1)
-        edge_unique, inverse=np.unique(edge, return_inverse=True, axis=0)
-        self.edge=torch.tensor(edge_unique, dtype=torch.int64)
-        self.element_to_edge_adj_table=inverse.reshape(-1,6).tolist()
-    
+    def convert_to_sixgon(self, clone_node=True):
+        #sixgon: hexagon 
+        element_new=self.element[:,[0,3,1,4,2,5]].clone()        
+        node=self.node
+        if clone_node == True:
+            node=node.clone()
+        mesh_new=PolygonMesh(node, element_new)
+        return mesh_new
+
     def update_node_normal(self, angle_weighted=True):
         self.element_area, self.element_normal=Tri6Mesh.cal_element_area_and_normal(self.node, self.element)
         self.node_normal=Tri6Mesh.cal_node_normal(self.node, self.element, angle_weighted, self.element_normal)

@@ -108,6 +108,10 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx, max_n
         #raise ValueError('curve is not closed at node '+str(idx_bad))
         print('curve may be open or self-intersect at node '+str(idx_bad)+" @ ExtractRegionEnclosedByCurve")
     #-------------------------
+    if mesh.element_to_edge_adj_table is None:
+        mesh.build_element_to_edge_adj_table()
+    element_to_edge_adj_table=mesh.element_to_edge_adj_table    
+    #-------------------------
     if mesh.edge_to_element_adj_table is None:
         mesh.build_edge_to_element_adj_table()
     edge_to_element_adj_table=mesh.edge_to_element_adj_table
@@ -132,13 +136,8 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx, max_n
     while True:
         new_active_element_list=[]
         for act_elm_idx in active_element_list:
-            for n in range(0, len(mesh.element[act_elm_idx])):
-                idx_n=int(mesh.element[act_elm_idx][n])
-                if n < len(mesh.element[act_elm_idx])-1:
-                    idx_n1=int(mesh.element[act_elm_idx][n+1])
-                else:
-                    idx_n1=int(mesh.element[act_elm_idx][0])
-                edge_idx=mesh.get_edge_idx_from_node_pair(idx_n, idx_n1)
+            edge_idx_list=element_to_edge_adj_table[act_elm_idx]
+            for edge_idx in edge_idx_list:
                 if edge_idx not in edge_curve:
                     adj_elm_idx=edge_to_element_adj_table[edge_idx]
                     if len(adj_elm_idx) > 2:

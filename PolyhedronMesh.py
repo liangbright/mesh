@@ -23,7 +23,7 @@ class PolyhedronMesh(Mesh):
         face_idx_list=[]
         for k in range(0, len(self.face)):
             adj_elm_idx=self.face_to_element_adj_table[k]
-            if len(adj_elm_idx) <= 1:
+            if len(adj_elm_idx) == 1:
                 face_idx_list.append(k)
         return face_idx_list
 

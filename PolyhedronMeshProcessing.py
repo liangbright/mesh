@@ -8,11 +8,10 @@ from Tet10Mesh import Tet10Mesh
 from copy import deepcopy
 from MeshProcessing import SimpleSmoother, SimpleSmootherForMesh, ComputeAngleBetweenTwoVectorIn3D, TracePolyline, \
                             IsCurveClosed, MergeMesh, FindConnectedRegion, FindNearestNode
-from PolygonMeshProcessing import PolygonMesh, QuadMesh, TriangleMesh                            
+from PolygonMeshProcessing import PolygonMesh, QuadMesh, TriangleMesh, Tri6Mesh                 
 #%%
-def ExtractSurfaceElement(mesh):
+def ExtractSurfaceElement_slow(mesh):
     #extract surface and make sure surface normal is from inside to outside
-    #return surface_element: every element is a linear polygon
     if ((not isinstance(mesh, TetrahedronMesh)) 
         and (not isinstance(mesh, Tet10Mesh))
         and (not isinstance(mesh, HexahedronMesh))):
@@ -43,10 +42,10 @@ def ExtractSurfaceElement(mesh):
             face.append([id1, id2, id3])
         elif isinstance(mesh, Tet10Mesh):
             id0, id1, id2, id3, id4, id5, id6, id7, id8, id9=elm
-            face.append([id0, id6, id2, id5, id1, id4])
-            face.append([id0, id4, id1, id8, id3, id7])
-            face.append([id0, id7, id3, id9, id2, id6])
-            face.append([id1, id5, id2, id9, id3, id8])
+            face.append([id0, id2, id1, id6, id5, id4])
+            face.append([id0, id1, id3, id4, id8, id7])
+            face.append([id0, id3, id2, id7, id9, id6])
+            face.append([id1, id2, id3, id5, id9, id8])
         elif isinstance(mesh, HexahedronMesh):
             id0, id1, id2, id3, id4, id5, id6, id7=elm
             face.append([id0, id3, id2, id1])
@@ -63,6 +62,13 @@ def ExtractSurfaceElement(mesh):
         surface_element.append(face[best_idx].tolist())
     return surface_element
 #%%
+def ExtractSurfaceElement(mesh):
+    #extract surface
+    #surface normal is from inside to outside - this is ensured when each face is defined
+    face_idx_list=mesh.find_boundary_face()
+    surface_element=mesh.face[face_idx_list].tolist()
+    return surface_element
+#%%
 def ExtractSurfaceMesh(mesh):
     surface_element=ExtractSurfaceElement(mesh)
     try:
@@ -71,6 +77,11 @@ def ExtractSurfaceMesh(mesh):
             temp_mesh=TriangleMesh(mesh.node, surface_element)
         elif surface_element.shape[1] == 4:
             temp_mesh=QuadMesh(mesh.node, surface_element)
+        elif surface_element.shape[1] == 6:
+            if isinstance(mesh, Tet10Mesh):
+                temp_mesh=Tri6Mesh(mesh.node, surface_element)
+            else:
+                temp_mesh=PolygonMesh(mesh.node, surface_element)
         else:
             temp_mesh=PolygonMesh(mesh.node, surface_element)
     except:

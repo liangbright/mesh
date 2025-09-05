@@ -1,12 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Mar 27 22:24:13 2021
-
-@author: liang
-"""
 import torch
 import torch_scatter
-from torch_sparse import SparseTensor
 import numpy as np
 from torch.linalg import det, cross
 from PolyhedronMesh import PolyhedronMesh
@@ -50,6 +43,7 @@ class TetrahedronMesh(PolyhedronMesh):
         face=[]
         for m in range(0, len(element)):
             id0, id1, id2, id3=element[m]
+            #face normal is from inside to outside of element[m]
             face.append([id0, id2, id1])
             face.append([id0, id1, id3])
             face.append([id0, id3, id2])
@@ -60,7 +54,7 @@ class TetrahedronMesh(PolyhedronMesh):
         self.face=torch.tensor(face[index], dtype=torch.int64)
         self.element_to_face_adj_table=inverse.reshape(-1,4).tolist()
 
-    def upate_element_volume(self):
+    def update_element_volume(self):
         self.element_volume=TetrahedronMesh.cal_element_volume(self.node, self.element)
     
     @staticmethod

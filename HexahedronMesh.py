@@ -57,6 +57,7 @@ class HexahedronMesh(PolyhedronMesh):
         face=[]
         for m in range(0, len(element)):
             id0, id1, id2, id3, id4, id5, id6, id7=element[m]
+            #face normal is from inside to outside of element[m]
             face.append([id0, id3, id2, id1])
             face.append([id4, id5, id6, id7])
             face.append([id0, id1, id5, id4])

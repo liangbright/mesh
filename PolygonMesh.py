@@ -53,14 +53,23 @@ class PolygonMesh(Mesh):
         self.build_element_to_edge_adj_table()
         
     def build_element_to_edge_adj_table(self):
-        if 'tri6' in self.mesh_type:
-            raise ValueError('tri6 node order is not linear')
+        flag_quadratic_element=False
+        if ('tri6' in self.mesh_type) or ('quad8' in self.mesh_type):
+            flag_quadratic_element=True
         element=self.element
         if not isinstance(element, list):
             element=element.tolist()
         edge=[]
         for m in range(0, len(element)):
             elm=element[m]
+            if flag_quadratic_element==True:
+                #re-order the nodes in elm
+                elmA=elm[0:len(elm)//2]
+                elmB=elm[len(elm)//2:]
+                elm=[]
+                for n in range(0, len(elmA)):
+                   elm.append(elmA[n]) 
+                   elm.append(elmB[n])               
             for k in range(0, len(elm)):
                 if k < len(elm)-1:
                     a=elm[k]; b=elm[k+1]

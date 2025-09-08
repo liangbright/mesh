@@ -31,7 +31,7 @@ class PolygonMesh(Mesh):
         data["PointAndFace"]=filename.split("/")[-1]+".vtk"
         with open(filename, "w") as outfile:
             json.dump(data, outfile, indent=4)
-        self.save_as_vtk(filename+".vtk", vtk42=True, use_vtk=False)
+        self.save_as_vtk(filename+".vtk", vtk42=True)
 
     def load_from_mdk_json(self, filename, dtype):
         self.load_from_vtk(filename+".vtk", dtype)

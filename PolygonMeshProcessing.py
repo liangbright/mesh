@@ -382,6 +382,20 @@ def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mes
         if smooth_first == False and k < n2_iters-1:
             SimpleSmootherForMesh(mesh_move, lamda, mask, n1_iters)
 #%%
+def ChamferDistance(meshA, meshB, reduction):
+    #this function is not differentiable
+    #perhaps, we should not name it ChamferDistance
+    nodeB_proj, __=ProjectPointToMesh(meshA, meshB.node)
+    nodeA_proj, __=ProjectPointToMesh(meshB, meshA.node)
+    distA=((meshA.node-nodeA_proj)**2).sum(dim=1).sqrt()
+    distB=((meshB.node-nodeB_proj)**2).sum(dim=1).sqrt()
+    if reduction == 'none':
+        return distA, distB
+    elif reduction == 'mean':
+        return 0.5*(distA.mean()+distB.mean())
+    else:
+        raise ValueError
+#%%
 def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()

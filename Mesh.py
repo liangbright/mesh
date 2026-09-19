@@ -242,37 +242,37 @@ class Mesh:
             self.element_data[name]=torch.tensor(data, dtype=dtype)
 
     @staticmethod
-    def get_vtk_cell_type(mesh_type, n_nodes):
+    def get_vtk_cell_type(mesh_type, n_node):
         #n_nodes: the number of nodes in an element
         #assume all elements have the same type
         if 'polyhedron' in mesh_type:
-            if n_nodes < 4:
+            if n_node < 4:
                 raise ValueError('wrong number of nodes')
-            elif n_nodes == 4:
+            elif n_node == 4:
                 cell_type=vtk.VTK_TETRA
-            elif (n_nodes == 6) and ('wedge6' in mesh_type): 
+            elif (n_node == 6) and ('wedge6' in mesh_type): 
                 cell_type=vtk.VTK_WEDGE
-            elif (n_nodes == 8) and ('hex8' in mesh_type):
+            elif (n_node == 8) and ('hex8' in mesh_type):
                 cell_type=vtk.VTK_HEXAHEDRON
-            elif (n_nodes == 10) and ('tet10' in mesh_type):
+            elif (n_node == 10) and ('tet10' in mesh_type):
                 cell_type=vtk.VTK_QUADRATIC_TETRA
             else:
                 #cell_type=vtk.VTK_POLYHEDRON
                 #print('warning: vtk may get stuck when cell_type=vtk.VTK_POLYHEDRON')
-                raise ValueError('not supported: '+str(mesh_type)+' '+str(n_nodes))
+                raise ValueError('not supported: '+str(mesh_type)+' '+str(n_node))
         elif 'polygon' in mesh_type:
-            if n_nodes < 3:
+            if n_node < 3:
                 raise ValueError('wrong number of nodes')
-            elif n_nodes == 3:
+            elif n_node == 3:
                 cell_type=vtk.VTK_TRIANGLE
-            elif n_nodes == 4:
+            elif n_node == 4:
                 cell_type=vtk.VTK_QUAD
-            elif n_nodes == 6:
+            elif n_node == 6:
                 if 'tri6' in mesh_type:
                     cell_type=vtk.VTK_QUADRATIC_TRIANGLE
                 else:
                     cell_type=vtk.VTK_POLYGON
-            elif n_nodes == 8:
+            elif n_node == 8:
                 if 'quad8' in mesh_type:
                     cell_type=vtk.VTK_QUADRATIC_QUAD
                 else:
@@ -280,9 +280,9 @@ class Mesh:
             else:
                 cell_type=vtk.VTK_POLYGON
         elif 'polyline' in mesh_type:
-            if n_nodes < 2:
+            if n_node < 2:
                 raise ValueError('wrong number of nodes')
-            elif n_nodes == 2:
+            elif n_node == 2:
                 cell_type=vtk.VTK_LINE 
             else:
                 cell_type=vtk.VTK_POLY_LINE

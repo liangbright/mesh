@@ -90,22 +90,22 @@ class TriangleMesh(PolygonMesh):
         angle=torch.cat([angle0.reshape(-1,1), angle1.reshape(-1,1), angle2.reshape(-1,1)], dim=1)
         return angle
 
-    def sample_points_on_elements(self, n_points):
-        return TriangleMesh.sample_points(self.node, self.element, n_points)
+    def sample_point(self, n_point):
+        return TriangleMesh.uniformly_sample_point(self.node, self.element, n_point)
 
     @staticmethod
-    def sample_points(node, element, n_points):
+    def uniformly_sample_point(node, element, n_point):
         area, normal=TriangleMesh.cal_element_area_and_normal(node, element)
         prob = area / area.sum()
-        if n_points > len(element):
-            sample = torch.multinomial(prob.reshape(-1), n_points-len(element), replacement=True)
+        if n_point > len(element):
+            sample = torch.multinomial(prob.reshape(-1), n_point-len(element), replacement=True)
             #print("sample_points", area.shape, prob.shape, sample.shape)
             element = torch.cat([element, element[sample]], dim=0)
         else:
-            sample = torch.multinomial(prob.reshape(-1), n_points, replacement=True)
+            sample = torch.multinomial(prob.reshape(-1), n_point, replacement=True)
             #print("sample_points", area.shape, prob.shape, sample.shape)
             element = element[sample]
-        a = torch.rand(2, n_points, 1, dtype=node.dtype, device=node.device)
+        a = torch.rand(2, n_point, 1, dtype=node.dtype, device=node.device)
         x0=node[element[:,0]]
         x1=node[element[:,1]]
         x2=node[element[:,2]]

@@ -3,29 +3,29 @@ import numpy as np
 from PolygonMeshProcessing import PolygonMesh, QuadMesh, merge_mesh_on_boundary, simple_smoother_for_mesh
 from HexahedronMesh import HexahedronMesh as Hex8Mesh
 #%%
-def create_quad_cylinder_mesh(n_circles, n_points_per_circle, radius=1, height=1, dtype=torch.float32):
-    theta=2*np.pi/n_points_per_circle
-    node=torch.zeros((n_circles*n_points_per_circle, 3), dtype=dtype)
+def create_quad_cylinder_mesh(n_circle, n_point_per_circle, radius=1, height=1, dtype=torch.float32):
+    theta=2*np.pi/n_point_per_circle
+    node=torch.zeros((n_circle*n_point_per_circle, 3), dtype=dtype)
     k=-1
-    for n in range(0, n_circles):
-        for m in range(0, n_points_per_circle):
+    for n in range(0, n_circle):
+        for m in range(0, n_point_per_circle):
             x=radius*np.cos(theta*m)
             y=radius*np.sin(theta*m)
-            z=height*n/(n_circles-1)
+            z=height*n/(n_circle-1)
             k=k+1
             node[k,0]=x
             node[k,1]=y
             node[k,2]=z
     element=[]
-    for n in range(1, n_circles):
-        idxA=np.arange((n-1)*n_points_per_circle, n*n_points_per_circle)
-        idxB=np.arange(n*n_points_per_circle, (n+1)*n_points_per_circle)
-        for i in range(0, n_points_per_circle-1):
+    for n in range(1, n_circle):
+        idxA=np.arange((n-1)*n_point_per_circle, n*n_point_per_circle)
+        idxB=np.arange(n*n_point_per_circle, (n+1)*n_point_per_circle)
+        for i in range(0, n_point_per_circle-1):
             element.append([idxA[i], idxA[i+1], idxB[i+1], idxB[i]])
-        element.append([idxA[n_points_per_circle-1], idxA[0], idxB[0], idxB[n_points_per_circle-1]])
+        element.append([idxA[n_point_per_circle-1], idxA[0], idxB[0], idxB[n_point_per_circle-1]])
     cylinder=QuadMesh(node, element)
-    cylinder.node_set["boundary_lower"]=np.arange(0, n_points_per_circle).tolist()
-    cylinder.node_set["boundary_upper"]=np.arange((n_circles-1)*n_points_per_circle, n_circles*n_points_per_circle).tolist()
+    cylinder.node_set["boundary_lower"]=np.arange(0, n_point_per_circle).tolist()
+    cylinder.node_set["boundary_upper"]=np.arange((n_circle-1)*n_point_per_circle, n_circle*n_point_per_circle).tolist()
     return cylinder
 #%%
 def create_quad_grid_mesh(Nx, Ny, dtype=torch.float32):
@@ -89,12 +89,12 @@ def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32):
     grid_mesh.node_set['boundary']=boundary
     return grid_mesh       
 #%%
-def create_quad_mesh_rectangle_in_rectangle(n_rings=3, Nx=3, Ny=3, seal_hole=True):
-    if n_rings < 2:
-        raise ValueError("n_rings must be >= 2")
+def create_quad_mesh_rectangle_in_rectangle(n_ring=3, Nx=3, Ny=3, seal_hole=True):
+    if n_ring < 2:
+        raise ValueError("n_ring must be >= 2")
     inner_mesh=create_quad_grid_mesh(Nx, Ny)
     inner_mesh.node-=inner_mesh.node.mean(dim=0, keepdim=True)
-    inner_mesh.node/=max(Nx, Ny)*n_rings    
+    inner_mesh.node/=max(Nx, Ny)*n_ring    
     # y
     #/|\
     # |
@@ -113,9 +113,9 @@ def create_quad_mesh_rectangle_in_rectangle(n_rings=3, Nx=3, Ny=3, seal_hole=Tru
     node=[]; element=[]
     node.extend(rect0.tolist())
     K=len(rect0)
-    rectN=rect0*n_rings
-    for n in range(1, n_rings):
-        rect_n=rect0+(rectN-rect0)*n/(n_rings-1) 
+    rectN=rect0*n_ring
+    for n in range(1, n_ring):
+        rect_n=rect0+(rectN-rect0)*n/(n_ring-1) 
         node.extend(rect_n.tolist())        
         for m in range(0, K):
             if m < K-1:
@@ -132,10 +132,10 @@ def create_quad_mesh_rectangle_in_rectangle(n_rings=3, Nx=3, Ny=3, seal_hole=Tru
     output_mesh=QuadMesh(node, element)
     element_counter_no_holes=len(element)
     if seal_hole == True:
-        output_mesh=merge_mesh_on_boundary([output_mesh, inner_mesh], distance_threshold=0.1/(max(Nx,Ny)*n_rings))
+        output_mesh=merge_mesh_on_boundary([output_mesh, inner_mesh], distance_threshold=0.1/(max(Nx,Ny)*n_ring))
         output_mesh=QuadMesh(output_mesh.node, output_mesh.element)
         output_mesh.element_set['hole']=np.arange(element_counter_no_holes, len(output_mesh.element)).tolist()
-    A=(2*Nx+2*Ny-4)*(n_rings-1)
+    A=(2*Nx+2*Ny-4)*(n_ring-1)
     B=A+Nx-1
     C=B+Ny-1
     D=C+Nx-1
@@ -155,8 +155,8 @@ def create_quad_mesh_rectangle_in_rectangle(n_rings=3, Nx=3, Ny=3, seal_hole=Tru
     output_mesh.node_set["line_da"]=np.arange(d, d+Ny-1).tolist()+[a]    
     return output_mesh
 #%%
-def create_quad_mesh_rectangle_in_cirlce(radius=1, n_rings=3, Nx=3, Ny=3, seal_hole=True):
-    output_mesh=create_quad_mesh_rectangle_in_rectangle(n_rings=n_rings, Nx=Nx, Ny=Ny, seal_hole=seal_hole)
+def create_quad_mesh_rectangle_in_cirlce(radius=1, n_ring=3, Nx=3, Ny=3, seal_hole=True):
+    output_mesh=create_quad_mesh_rectangle_in_rectangle(n_ring=n_ring, Nx=Nx, Ny=Ny, seal_hole=seal_hole)
     # y
     #/|\
     # |
@@ -205,36 +205,36 @@ def create_quad_mesh_rectangle_in_cirlce(radius=1, n_rings=3, Nx=3, Ny=3, seal_h
     mask[lineBC]=0
     mask[lineCD]=0
     mask[lineDA]=0
-    simple_smoother_for_mesh(output_mesh, 0.5, mask, n_iters=(n_rings+Nx+Ny)*10)
+    simple_smoother_for_mesh(output_mesh, 0.5, mask, n_iters=(n_ring+Nx+Ny)*10)
     return output_mesh
 #%%
-def create_quad_tri_mesh_circle_in_circle(n_circles=3, n_points_per_circle=11, radius=1, seal_hole=True):
-    theta=2*np.pi/n_points_per_circle
+def create_quad_tri_mesh_circle_in_circle(n_circle=3, n_point_per_circle=11, radius=1, seal_hole=True):
+    theta=2*np.pi/n_point_per_circle
     node=[]
-    for n in range(0, n_circles):
-        R=radius*(1-n/(n_circles))
-        for m in range(0, n_points_per_circle):
+    for n in range(0, n_circle):
+        R=radius*(1-n/(n_circle))
+        for m in range(0, n_point_per_circle):
             x=R*np.cos(theta*m)
             y=R*np.sin(theta*m)
             node.append([x,y,0])
     element=[]
-    for n in range(1, n_circles):
-        idxA=np.arange((n-1)*n_points_per_circle, n*n_points_per_circle)
-        idxB=np.arange(n*n_points_per_circle, (n+1)*n_points_per_circle)
-        for i in range(0, n_points_per_circle-1):
+    for n in range(1, n_circle):
+        idxA=np.arange((n-1)*n_point_per_circle, n*n_point_per_circle)
+        idxB=np.arange(n*n_point_per_circle, (n+1)*n_point_per_circle)
+        for i in range(0, n_point_per_circle-1):
             element.append([idxA[i], idxA[i+1], idxB[i+1], idxB[i]])
-        element.append([idxA[n_points_per_circle-1], idxA[0], idxB[0], idxB[n_points_per_circle-1]])
+        element.append([idxA[n_point_per_circle-1], idxA[0], idxB[0], idxB[n_point_per_circle-1]])
     element_counter_no_holes=len(element)
     if seal_hole == True:
         node.append([0,0,0])
         center_idx=len(node)-1
-        curve=np.arange((n_circles-1)*n_points_per_circle, n_circles*n_points_per_circle)
-        for k in range(0, n_points_per_circle-1):
+        curve=np.arange((n_circle-1)*n_point_per_circle, n_circle*n_point_per_circle)
+        for k in range(0, n_point_per_circle-1):
             element.append([center_idx, curve[k], curve[k+1]])
         element.append([center_idx, curve[len(curve)-1], curve[0]])
     output_mesh=PolygonMesh(node, element)
     output_mesh.element_set['hole']=np.arange(element_counter_no_holes, len(output_mesh.element)).tolist()
-    output_mesh.node_set['boundary']=np.arange(0, n_points_per_circle).tolist()
+    output_mesh.node_set['boundary']=np.arange(0, n_point_per_circle).tolist()
     return output_mesh
 #%%
 if __name__ == '__main__':
@@ -244,12 +244,12 @@ if __name__ == '__main__':
     mesh1=create_hex_grid_mesh(10,20,2)
     mesh1.save_as_vtk("D:/MLFEA/TAA/mesh/hex_grid_mesh_x10y20z2.vtk")
     #%%
-    mesh2=create_quad_mesh_rectangle_in_rectangle(n_rings=5, Nx=5, Ny=5)
+    mesh2=create_quad_mesh_rectangle_in_rectangle(n_ring=5, Nx=5, Ny=5)
     mesh2.save_as_vtk("D:/MLFEA/TAA/mesh/quad_mesh_rect_in_rect.vtk")
     #mesh2=mesh2.subdivide_to_quad()
     #mesh2=mesh2.subdivide_to_quad()
     #mesh2.save_as_vtk("D:/MLFEA/TAA/mesh/quad_mesh_rect_in_rect_sub2.vtk")
     #%%
-    mesh3=create_quad_tri_mesh_circle_in_circle(n_circles=3, n_points_per_circle=11, radius=1, seal_hole=True)
+    mesh3=create_quad_tri_mesh_circle_in_circle(n_circle=3, n_point_per_circle=11, radius=1, seal_hole=True)
     mesh3.save_as_vtk("D:/MLFEA/TAA/mesh/quad_tri_mesh_circle_in_circle.vtk")
     

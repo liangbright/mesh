@@ -82,7 +82,7 @@ def simple_smoother(field, adj_link, lamda, mask, inplace):
 #%%
 SimpleSmoother=simple_smoother
 #%%
-def simple_smoother_for_mesh(mesh, lamda, mask, n_iters):
+def simple_smoother_for_mesh(mesh, lamda, mask, n_iter):
     #lamda: x_i = x_i + lamda*mean_j(x_j - x_i),  0<=lamda<=1
     #mesh.node is modified
     #if mask is not None: mask[k]: 1 to smooth the node-k; 0 not to smooth the node-k
@@ -92,7 +92,7 @@ def simple_smoother_for_mesh(mesh, lamda, mask, n_iters):
     if mesh.node_to_node_adj_link is None:
         mesh.build_node_to_node_adj_link()
     adj_link=mesh.node_to_node_adj_link
-    for n in range(0, n_iters):
+    for n in range(0, n_iter):
         SimpleSmoother(mesh.node, adj_link, lamda, mask, inplace=True)
 #%%
 SimpleSmootherForMesh=simple_smoother_for_mesh        
@@ -241,6 +241,7 @@ def remove_unused_node(mesh, return_node_idx_list=False, clear_adj_info=True):
             else:
                 elm[n]=map[idx]
     node_idx_list=torch.where(map>=0)[0]
+    node_idx_list=node_idx_list[torch.argsort(map[node_idx_list])]
     node=mesh.node[node_idx_list]
     mesh.copy(node, element)
     if clear_adj_info == True:

@@ -100,11 +100,11 @@ def find_mesh_boundary_curve(mesh):
 #%% old name
 FindMeshBoundaryCurve=find_mesh_boundary_curve
 #%%
-def extract_region_enclosed_by_curve(mesh, node_curve_list, inner_element_idx, max_n_elements=float('inf')):
+def extract_region_enclosed_by_curve(mesh, node_curve_list, inner_element_idx, max_n_element=float('inf')):
     #node_curve_list[k] is a curve - represented by a list/array of node indexes on mesh
     #the combined curve (from curve_list[0] to curve_list[-1]) is closed
     #inner_element_idx is the index of an element inside the region
-    #max_n_elements: maximum number of elements in the region
+    #max_n_element: maximum number of elements in the region
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     #-------------------------
@@ -204,7 +204,7 @@ def merge_mesh_on_boundary(mesh_list, distance_threshold):
 #%% old name
 MergeMeshOnBoundary=merge_mesh_on_boundary
 #%%
-def simple_smoother_for_mesh_node_normal(mesh, lamda, mask, n_iters, update_node_normal=True):
+def simple_smoother_for_mesh_node_normal(mesh, lamda, mask, n_iter, update_node_normal=True):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     if update_node_normal == True:
@@ -213,7 +213,7 @@ def simple_smoother_for_mesh_node_normal(mesh, lamda, mask, n_iters, update_node
     if mesh.node_to_node_adj_link is None:
         mesh.build_node_to_node_adj_link()
     adj_link=mesh.node_to_node_adj_link
-    for n in range(0, n_iters):
+    for n in range(0, n_iter):
         simple_smoother(node_normal, adj_link, lamda, mask, inplace=True)
         normal_norm=norm(node_normal, ord=2, dim=1, keepdim=True)
         normal_norm=normal_norm.clamp(min=1e-12)
@@ -223,7 +223,7 @@ def simple_smoother_for_mesh_node_normal(mesh, lamda, mask, n_iters, update_node
 #%% old name
 SimpleSmootherForMeshNodeNormal=simple_smoother_for_mesh_node_normal
 #%%
-def simple_smoother_for_mesh_element_normal(mesh, lamda, mask, n_iters, update_element_normal=True):
+def simple_smoother_for_mesh_element_normal(mesh, lamda, mask, n_iter, update_element_normal=True):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     if update_element_normal == True:
@@ -232,7 +232,7 @@ def simple_smoother_for_mesh_element_normal(mesh, lamda, mask, n_iters, update_e
     if mesh.element_to_element_adj_link['node'] is None:
         mesh.build_element_to_element_adj_link('node')
     adj_link=mesh.element_to_element_adj_link['node']
-    for n in range(0, n_iters):
+    for n in range(0, n_iter):
         simple_smoother(element_normal, adj_link, lamda, mask, inplace=True)
         normal_norm=norm(element_normal, ord=2, dim=1, keepdim=True)
         normal_norm=normal_norm.clamp(min=1e-12)
@@ -242,7 +242,7 @@ def simple_smoother_for_mesh_element_normal(mesh, lamda, mask, n_iters, update_e
 #%% old name
 SimpleSmootherForMeshElementNormal=simple_smoother_for_mesh_element_normal
 #%%
-def simple_smoother_for_quad_mesh(mesh, lamda, mask, n_iters):
+def simple_smoother_for_quad_mesh(mesh, lamda, mask, n_iter):
     if not isinstance(mesh, QuadMesh):
         raise NotImplementedError
     if mesh.node_to_element_adj_table is None:
@@ -262,7 +262,7 @@ def simple_smoother_for_quad_mesh(mesh, lamda, mask, n_iters):
         adj_link=torch.tensor(adj_link, dtype=torch.int64)
         adj_link=torch.unique(adj_link, dim=0, sorted=True)
         mesh.mesh_data['quad_node_to_node_adj_link']=adj_link
-    for n in range(0, n_iters):
+    for n in range(0, n_iter):
         simple_smoother(mesh.node, adj_link, lamda, mask, inplace=True)
 #%% old name
 SimpleSmootherForQuadMesh=simple_smoother_for_quad_mesh
@@ -401,20 +401,20 @@ def project_point_to_mesh(point, mesh, mesh_vtk=None, dtype=None):
 #%% old name
 ProjectPointToMesh=project_point_to_mesh
 #%%
-def smooth_and_project(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mesh_fixed_vtk=None, smooth_first=True):
+def smooth_and_project(mesh_move, mesh_fixed, lamda, mask, n1_iter, n2_iter, mesh_fixed_vtk=None, smooth_first=True):
     #smooth mesh_move and project it to mesh_fixed
     #mesh_move.node is modified
     #mesh_fixed must be a triangle mesh
     if mesh_fixed_vtk is None:
         mesh_fixed_vtk=mesh_fixed.convert_to_vtk()
-    for k in range(0, n2_iters):
+    for k in range(0, n2_iter):
         if smooth_first == True:
-            simple_smoother_for_mesh(mesh_move, lamda, mask, n1_iters)
+            simple_smoother_for_mesh(mesh_move, lamda, mask, n1_iter)
         node_proj, element_proj=project_point_to_mesh(mesh_move.node, mesh_fixed, mesh_fixed_vtk)        
         temp=mask.view(-1)
         mesh_move.node[temp>0]=node_proj[temp>0]
-        if smooth_first == False and k < n2_iters-1:
-            simple_smoother_for_mesh(mesh_move, lamda, mask, n1_iters)
+        if smooth_first == False and k < n2_iter-1:
+            simple_smoother_for_mesh(mesh_move, lamda, mask, n1_iter)
 #%% old name
 SmoothAndProject=smooth_and_project            
 #%%
@@ -717,7 +717,7 @@ def find_dijkstra_graph_geodesic_path(mesh, start_node_idx, end_node_idx, mesh_v
 #%% old name
 FindDijkstraGraphGeodesicPath=find_dijkstra_graph_geodesic_path
 #%%
-def subdivide(mesh, n_subdivisions, method='linear', mesh_vtk=None, dtype=None):
+def subdivide(mesh, n_subdivision, method='linear', mesh_vtk=None, dtype=None):
     #method: 
     # linear-> vtkLinearSubdivisionFilter
     # loop -> vtkLoopSubdivisionFilter
@@ -743,7 +743,7 @@ def subdivide(mesh, n_subdivisions, method='linear', mesh_vtk=None, dtype=None):
         filter=vtk.vtkButterflySubdivisionFilter()
     else:
         raise ValueError
-    filter.SetNumberOfSubdivisions(n_subdivisions)
+    filter.SetNumberOfSubdivisions(n_subdivision)
     filter.SetInputData(mesh_vtk)
     filter.update()
     output_mesh=PolygonMesh()

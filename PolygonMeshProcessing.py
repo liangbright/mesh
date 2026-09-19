@@ -359,7 +359,7 @@ def project_point_to_mesh(point, mesh, mesh_vtk=None, dtype=None):
     #to be backward compatible
     arg1=point
     arg2=mesh
-    if torch.is_tensor(arg2) or isinstance(arg2, np.ndarray()):
+    if torch.is_tensor(arg2) or isinstance(arg2, np.ndarray):
         point=arg2
         mesh=arg1
     #---------------

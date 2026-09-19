@@ -9,7 +9,7 @@ import torch_scatter
 import numpy as np
 from Mesh import Mesh
 from copy import deepcopy
-from GeometryUtility import cal_angle_between_3d_vector
+from GeometryUtility import cal_angle_between_3d_vector, ComputeAngleBetweenTwoVectorIn3D
 #%%
 def find_connected_region(mesh, ref_element_idx, adj):
     if not isinstance(mesh, Mesh):
@@ -225,7 +225,7 @@ MergeMesh=merge_mesh
 def remove_unused_node(mesh, return_node_idx_list=False, clear_adj_info=True):
     #if a node does not belong to an element, then it is unused
     #this function may change the node order in mesh.node
-    element=mesh.copy_element("list")
+    element=mesh.make_element_copy("list")
     map=-torch.ones(mesh.node.shape[0], dtype=torch.int64)
     node_idx=-1
     for m in range(0, len(element)):
@@ -268,7 +268,10 @@ def find_nearest_node(mesh, point, distance_threshold=np.inf):
     if flag == False:
         return node_idx_list
     else:
-        return node_idx_list[0]
+        if len(node_idx_list) > 0:
+            return node_idx_list[0]
+        else:
+            return None
 #%%
 FindNearestNode=find_nearest_node
 #%%

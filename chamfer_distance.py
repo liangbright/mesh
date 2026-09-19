@@ -28,8 +28,9 @@ def cal_distance(P1, P2, reduction, squared_distance, scale_input=True):
     #P2.shape:  Mx3 or Mx2, etc, M is the number of points in P2
     #set squared_distance=True for loss function
     #set scale_input=True to prevent issues in knn
+    P1s, P2s=P1, P2
     if scale_input==True:
-        P1s, P2s=scale(P1, P2)
+        P1s, P2s=scale(P1s, P2s)
     index2=knn(P2s, P1s, 1)
     index2=index2[1]
     dist=((P2[index2]-P1)**2).sum(dim=-1)
@@ -49,8 +50,9 @@ def cal_chamfer_distance(P1, P2, reduction, squared_distance, scale_input=True):
     #P2.shape:  Mx3 or Mx2, etc, M is the number of points in P2
     #set squared_distance=True for loss function
     #set scale_input=True to prevent issues in knn
+    P1s, P2s=P1, P2
     if scale_input==True:
-        P1s, P2s=scale(P1, P2)
+        P1s, P2s=scale(P1s, P2s)
     index1=knn(P1s, P2s, 1)
     index1=index1[1]
     index2=knn(P2s, P1s, 1)
@@ -81,8 +83,9 @@ def cal_distance_batch(P1, P2, reduction, squared_distance, scale_input=True):
     P1=P1.view(B*N,-1)
     M=P2.shape[1]
     P2=P2.view(B*M,-1)
+    P1s, P2s=P1, P2
     if scale_input==True:
-        P1s, P2s=scale(P1, P2)
+        P1s, P2s=scale(P1s, P2s)
     batch_P1=[]
     batch_P2=[]
     for k in range(0, B):
@@ -90,7 +93,7 @@ def cal_distance_batch(P1, P2, reduction, squared_distance, scale_input=True):
         batch_P2.extend([k]*M)
     batch_P1=torch.tensor(batch_P1, dtype=torch.int64, device=P1.device)
     batch_P2=torch.tensor(batch_P2, dtype=torch.int64, device=P1.device)
-    index2=knn(P2s, P1s, 1, batch_P1,  batch_P2)
+    index2=knn(P2s, P1s, 1, batch_P2,  batch_P1)
     index2=index2[1]
     dist=((P2[index2]-P1)**2).sum(dim=-1)
     if squared_distance == False:
@@ -116,8 +119,9 @@ def cal_chamfer_distance_batch(P1, P2, reduction, squared_distance, scale_input=
     P1=P1.view(B*N,-1)
     M=P2.shape[1]
     P2=P2.view(B*M,-1)
+    P1s, P2s=P1, P2
     if scale_input==True:
-        P1s, P2s=scale(P1, P2)
+        P1s, P2s=scale(P1s, P2s)
     batch_P1=[]
     batch_P2=[]
     for k in range(0, B):

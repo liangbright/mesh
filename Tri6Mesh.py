@@ -4,7 +4,7 @@ import torch_scatter
 import numpy as np
 from TriangleMesh import TriangleMesh
 from PolygonMesh import PolygonMesh
-import PolygonMeshProcessing as pmp
+from GeometryUtility import cal_angle_between_3d_vector
 #%%
 class Tri6Mesh(PolygonMesh):
     #6-node triangle element mesh
@@ -196,12 +196,12 @@ class Tri6Mesh(PolygonMesh):
         #   x5   x4
         #  /      \
         # x0--x3--x1
-        angle0=pmp.ComputeAngleBetweenTwoVectorIn3D(x3-x0, x5-x0, return_cos)
-        angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x4-x1, x3-x1, return_cos)
-        angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x5-x2, x4-x2, return_cos)
-        angle3=pmp.ComputeAngleBetweenTwoVectorIn3D(x1-x3, x0-x3, return_cos)
-        angle4=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x4, x1-x4, return_cos)
-        angle5=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x5, x2-x5, return_cos)
+        angle0=cal_angle_between_3d_vector(x3-x0, x5-x0, return_cos)
+        angle1=cal_angle_between_3d_vector(x4-x1, x3-x1, return_cos)
+        angle2=cal_angle_between_3d_vector(x5-x2, x4-x2, return_cos)
+        angle3=cal_angle_between_3d_vector(x1-x3, x0-x3, return_cos)
+        angle4=cal_angle_between_3d_vector(x2-x4, x1-x4, return_cos)
+        angle5=cal_angle_between_3d_vector(x0-x5, x2-x5, return_cos)
         angle=torch.cat([angle0.reshape(-1,1), angle1.reshape(-1,1), angle2.reshape(-1,1),
                          angle3.reshape(-1,1), angle4.reshape(-1,1), angle5.reshape(-1,1)], dim=1)
         return angle

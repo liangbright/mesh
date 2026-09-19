@@ -780,7 +780,7 @@ class Mesh:
             self.build_face_to_element_adj_table()
         adj_link=[]
         for n in range(0, len(self.face_to_element_adj_table)):
-            e_set=self.face_to_element_adj_table['face'][n]
+            e_set=self.face_to_element_adj_table[n]
             for m1 in range(0, len(e_set)):
                 for m2 in range(m1+1, len(e_set)):
                     eid1=e_set[m1]; eid2=e_set[m2]

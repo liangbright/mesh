@@ -283,7 +283,7 @@ if __name__ == "__main__":
     #%%
     wall.update_element_area_and_normal()
     #%%
-    points=wall.sample_point(10*len(wall.node))
+    sampled_point=wall.sample_point(10*len(wall.node))
     #%%
     wall_new=wall.subdivide()
     wall_new.save_by_vtk("wall_new.vtk")

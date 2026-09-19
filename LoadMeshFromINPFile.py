@@ -94,18 +94,18 @@ def fix_inp_element(inp):
             if "*" in inp[k]:
                 end_index=k
                 break
-        lines=inp[start_index:end_index]
+        line_list=inp[start_index:end_index]
         flag=False
-        for k in range(0, len(lines)):
+        for k in range(0, len(line_list)):
             if inp[start_index+k][-2].isdigit() == False:
                 flag=True
                 break
         if flag == True:
             out=[""]
-            for k in range(0, len(lines)):
+            for k in range(0, len(line_list)):
                 out[-1]=out[-1]+inp[start_index+k][:-1]
                 if inp[start_index+k][-2].isdigit() == True:
-                    if k < len(lines)-1:
+                    if k < len(line_list)-1:
                         out.append("")
             inp=inp[:start_index]+out+inp[end_index:]
     return inp

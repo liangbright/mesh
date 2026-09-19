@@ -372,7 +372,7 @@ def project_point_to_mesh(point, mesh, mesh_vtk=None, dtype=None):
         else:
             raise ValueError('dtype is unknown')
     #------------------------------------------
-    if torch.is_tensor(point) or isinstance(point, np.ndarray()):
+    if torch.is_tensor(point) or isinstance(point, np.ndarray):
         if len(point.shape) == 1:
             point=point.reshape(1,3)
         if len(point.shape) != 2:

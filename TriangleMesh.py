@@ -109,7 +109,10 @@ class TriangleMesh(PolygonMesh):
         x0=node[element[:,0]]
         x1=node[element[:,1]]
         x2=node[element[:,2]]
-        x=a[1]*(a[0]*x1+(1-a[0])*x2)+(1-a[1])*x0
+        #x=a[1]*(a[0]*x1+(1-a[0])*x2)+(1-a[1])*x0
+        u=a[0].sqrt()
+        v=a[1]
+        x=(1-u)*x0+u*(1-v)*x1+u*v*x2
         return x
 
     def subdivid_to_tri_1to4(self):

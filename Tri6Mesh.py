@@ -39,7 +39,7 @@ class Tri6Mesh(PolygonMesh):
         node_new=torch.cat([tri3_mesh.node, nodeA], dim=0)        
         element=tri3_mesh.element.tolist()
         element_new=[]
-        for m in range(0, element.shape[0]):
+        for m in range(0, len(element)):
             #-----------
             #     x2
             #    /  \

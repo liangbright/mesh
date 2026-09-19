@@ -70,11 +70,11 @@ class HexahedronMesh(PolyhedronMesh):
         self.face=torch.tensor(face[index], dtype=torch.int64)
         self.element_to_face_adj_table=inverse.reshape(-1,6).tolist()
 
-    def upate_element_volume(self):
+    def update_element_volume(self):
         self.element_volume=HexahedronMesh.cal_element_volume(self.node, self.element)
     
     @staticmethod
-    def cal_element_volumn(node, element):
+    def cal_element_volume(node, element):
         #X=self.node[self.element]#shape (M,8,3)
         #r1i=get_integration_point_1i(X.dtype, X.device)
         #dX_dr=cal_dh_dr(r1i, X)

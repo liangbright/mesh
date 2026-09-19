@@ -5,117 +5,13 @@ Created on Fri Nov  3 00:12:58 2023
 @author: liang
 """
 import torch
-from torch.linalg import vector_norm as norm
 import torch_scatter
 import numpy as np
 from Mesh import Mesh
 from copy import deepcopy
+from GeometryUtility import cal_angle_between_3d_vector
 #%%
-def ComputeAngleBetweenTwoVectorIn3D_slow(VectorA, VectorB):
-    #angle from A to B, right hand rule
-    #angle ~[0 ~2pi]
-    #VectorA.shape (B,3)
-    #VectorB.shape (B,3)
-    if len(VectorA.shape) == 1:
-        VectorA=VectorA.view(1,3)
-    if len(VectorB.shape) == 1:
-        VectorB=VectorB.view(1,3)
-    
-    if VectorA.dtype != VectorB.dtype:
-        raise ValueError
-    
-    if VectorA.dtype == np.float32 or VectorA.dtype == torch.float32:
-        eps1=1e-12
-        eps2=1e-7 # torch.acos grad issue, it must be 1e-7        
-    elif VectorA.dtype == np.float64 or VectorA.dtype == torch.float64:
-        eps1=1e-12
-        eps2=1e-16
-    
-    if isinstance(VectorA, np.ndarray) and isinstance(VectorA, np.ndarray):
-        L2Norm_A = np.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
-        L2Norm_B = np.sqrt(VectorB[:,0]*VectorB[:,0]+VectorB[:,1]*VectorB[:,1]+VectorB[:,2]*VectorB[:,2])
-        if np.any(L2Norm_A <= eps1) or np.any(L2Norm_B <= eps1):
-            print("L2Norm <= eps, np.clip to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
-        L2Norm_A=np.clip(L2Norm_A, min=eps1)
-        L2Norm_B=np.clip(L2Norm_B, min=eps1)
-        CosTheta = (VectorA[:,0]*VectorB[:,0]+VectorA[:,1]*VectorB[:,1]+VectorA[:,2]*VectorB[:,2])/(L2Norm_A*L2Norm_B);
-        CosTheta = np.clip(CosTheta, min=-1, max=1)
-        Theta = np.arccos(CosTheta) #[0, pi], acos(-1) = pi
-    elif isinstance(VectorA, torch.Tensor) and isinstance(VectorA,  torch.Tensor):
-        L2Norm_A = torch.sqrt(VectorA[:,0]*VectorA[:,0]+VectorA[:,1]*VectorA[:,1]+VectorA[:,2]*VectorA[:,2])
-        L2Norm_B = torch.sqrt(VectorB[:,0]*VectorB[:,0]+VectorB[:,1]*VectorB[:,1]+VectorB[:,2]*VectorB[:,2])
-        if torch.any(L2Norm_A <= eps1) or torch.any(L2Norm_B <= eps1):
-            print("L2Norm <= eps, torch.clamp to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
-        with torch.no_grad():
-            L2Norm_A.data.clamp_(min=eps1)
-            L2Norm_B.data.clamp_(min=eps1)                
-        CosTheta = (VectorA[:,0]*VectorB[:,0]+VectorA[:,1]*VectorB[:,1]+VectorA[:,2]*VectorB[:,2])/(L2Norm_A*L2Norm_B);              
-        CosTheta = torch.clamp(CosTheta, min=-1+eps2, max=1-eps2)
-        Theta = torch.acos(CosTheta) #[0, pi], acos(-1) = pi
-    return Theta
-    '''
-    #https://github.com/pytorch/pytorch/issues/8069  
-    eps=1e-16
-    x=torch.tensor(-1.0, requires_grad=True, dtype=torch.float64)
-    x1=torch.clamp(x, min=-1+eps, max=1-eps)
-    Theta = torch.acos(x1)
-    Theta.backward()
-    print(x.grad)
-    '''
-#%%
-def ComputeAngleBetweenTwoVectorIn3D(VectorA, VectorB, return_cos=False):
-    #angle from A to B, right hand rule
-    #angle ~[0 ~2pi]
-    #VectorA.shape (B,3)
-    #VectorB.shape (B,3)
-    if len(VectorA.shape) == 1:
-        VectorA=VectorA.reshape(1,3)
-    if len(VectorB.shape) == 1:
-        VectorB=VectorB.reshape(1,3)
-    
-    if VectorA.dtype != VectorB.dtype:
-        raise ValueError
-    
-    if VectorA.dtype == np.float32 or VectorA.dtype == torch.float32:
-        eps1=1e-12
-        eps2=1e-7 # torch.acos grad issue, it must be 1e-7        
-    elif VectorA.dtype == np.float64 or VectorA.dtype == torch.float64:
-        eps1=1e-12
-        eps2=1e-16
-    
-    if isinstance(VectorA, np.ndarray) and isinstance(VectorA, np.ndarray):
-        L2Norm_A = np.linalg.norm(VectorA, ord=2, axis=-1)
-        L2Norm_B = np.linalg.norm(VectorB, ord=2, axis=-1)
-        if np.any(L2Norm_A <= eps1) or np.any(L2Norm_B <= eps1):
-            print("L2Norm <= eps, np.clip to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
-        L2Norm_A=np.clip(L2Norm_A, a_min=eps1, a_max=np.inf)
-        L2Norm_B=np.clip(L2Norm_B, a_min=eps1, a_max=np.inf)
-        CosTheta = np.sum(VectorA*VectorB, axis=-1)/(L2Norm_A*L2Norm_B);
-        CosTheta = np.clip(CosTheta, a_min=-1, a_max=1)
-        if return_cos == False:
-            Theta = np.arccos(CosTheta) #[0, pi], acos(-1) = pi
-            return Theta    
-        else:
-            return CosTheta
-    elif isinstance(VectorA, torch.Tensor) and isinstance(VectorA, torch.Tensor):
-        L2Norm_A=norm(VectorA, ord=2, dim=-1)
-        L2Norm_B=norm(VectorB, ord=2, dim=-1)        
-        if torch.any(L2Norm_A <= eps1) or torch.any(L2Norm_B <= eps1):
-            print("L2Norm <= eps, torch.clamp to eps @ ComputeAngleBetweenTwoVectorIn3D(...)")
-        with torch.no_grad():
-            L2Norm_A.data.clamp_(min=eps1)
-            L2Norm_B.data.clamp_(min=eps1)         
-        CosTheta = (VectorA*VectorB).sum(dim=-1)/(L2Norm_A*L2Norm_B);                      
-        if return_cos == False:
-            CosTheta = torch.clamp(CosTheta, min=-1+eps2, max=1-eps2)
-            Theta = torch.acos(CosTheta) #[0, pi], acos(-1) = pi
-            return Theta    
-        else:
-            return CosTheta
-    else:
-        raise ValueError('invalid input')
-#%%
-def FindConnectedRegion(mesh, ref_element_idx, adj):
+def find_connected_region(mesh, ref_element_idx, adj):
     if not isinstance(mesh, Mesh):
         raise NotImplementedError
     if adj not in ["node", "edge", "face"]:
@@ -139,7 +35,9 @@ def FindConnectedRegion(mesh, ref_element_idx, adj):
     #indexes of elements
     return region_element_list
 #%%
-def SegmentMeshToConnectedRegion(mesh, adj):
+FindConnectedRegion=find_connected_region
+#%%
+def segment_mesh_to_connected_region(mesh, adj):
     element_list=np.arange(0, len(mesh.element)).tolist()
     region_list=[]
     while True:
@@ -150,7 +48,9 @@ def SegmentMeshToConnectedRegion(mesh, adj):
         element_list=list(set(element_list)-set(region))
     return region_list
 #%%
-def SimpleSmoother(field, adj_link, lamda, mask, inplace):
+SegmentMeshToConnectedRegion=segment_mesh_to_connected_region
+#%%
+def simple_smoother(field, adj_link, lamda, mask, inplace):
     #field.shape (N, ?)
     if mask is None:
         mask=1    
@@ -180,7 +80,9 @@ def SimpleSmoother(field, adj_link, lamda, mask, inplace):
         field=field+delta
     return field
 #%%
-def SimpleSmootherForMesh(mesh, lamda, mask, n_iters):
+SimpleSmoother=simple_smoother
+#%%
+def simple_smoother_for_mesh(mesh, lamda, mask, n_iters):
     #lamda: x_i = x_i + lamda*mean_j(x_j - x_i),  0<=lamda<=1
     #mesh.node is modified
     #if mask is not None: mask[k]: 1 to smooth the node-k; 0 not to smooth the node-k
@@ -193,7 +95,9 @@ def SimpleSmootherForMesh(mesh, lamda, mask, n_iters):
     for n in range(0, n_iters):
         SimpleSmoother(mesh.node, adj_link, lamda, mask, inplace=True)
 #%%
-def IsCurveClosed(mesh, curve):
+SimpleSmootherForMesh=simple_smoother_for_mesh        
+#%%
+def is_curve_closed(mesh, curve):
     #curve is list/array of node indexes on mesh
     #if curve is closed, then return True
     #the nodes in curve could be in a random order
@@ -209,7 +113,9 @@ def IsCurveClosed(mesh, curve):
             return False, idx
     return True, None
 #%%
-def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_threshold=np.pi/2):
+IsCurveClosed=is_curve_closed
+#%%
+def trace_polyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_threshold=np.pi/2):
     #find a smoothed polyline on mesh: start_node_idx -> next_node_idx -> ... -> end_node_idx
     #no self-interselction
     if not isinstance(mesh, Mesh):
@@ -225,36 +131,38 @@ def TracePolyline(mesh, start_node_idx, next_node_idx, end_node_idx=None, angle_
     if mesh.node_to_node_adj_table is None:
         mesh.build_node_to_node_adj_table()
     node_adj_table=mesh.node_to_node_adj_table
-    Polyline=[start_node_idx, next_node_idx]
+    polyline=[start_node_idx, next_node_idx]
     while True:
-        idx_list_next=node_adj_table[Polyline[-1]]
-        idx_list_next=list(set(idx_list_next)-set(Polyline))
+        idx_list_next=node_adj_table[polyline[-1]]
+        idx_list_next=list(set(idx_list_next)-set(polyline))
         if len(idx_list_next) == 0:
             break
         if end_node_idx in idx_list_next:
-            Polyline.append(end_node_idx)
+            polyline.append(end_node_idx)
             break
         angel_list=[]
         for k in range(0, len(idx_list_next)):
-            idxA=Polyline[-2]
-            idxB=Polyline[-1]
+            idxA=polyline[-2]
+            idxB=polyline[-1]
             idxC=idx_list_next[k]
             vector0=mesh.node[idxB]-mesh.node[idxA]
             vector1=mesh.node[idxC]-mesh.node[idxB]
-            angle_k=ComputeAngleBetweenTwoVectorIn3D(vector0, vector1)
+            angle_k=cal_angle_between_3d_vector(vector0, vector1)
             angle_k=angle_k.view(-1).item()
             angel_list.append(angle_k)
         k_min=np.argmin(angel_list)
         if angel_list[k_min] > angle_threshold:
             break
         else:
-            Polyline.append(idx_list_next[k_min])
-    if (end_node_idx is not None) and (Polyline[-1] != end_node_idx):
-        print("warning: Polyline[-1] != end_node_idx @ TracePolyline")
+            polyline.append(idx_list_next[k_min])
+    if (end_node_idx is not None) and (polyline[-1] != end_node_idx):
+        print("warning: polyline[-1] != end_node_idx @ TracePolyline")
     #done
-    return Polyline
+    return polyline
 #%%
-def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
+TracePolyline=trace_polyline
+#%%
+def merge_mesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
     #Merge: meshA <= meshB
     #The shared points are in node_idx_listA of meshA and node_idx_listB of meshB
     #if both node_idx_listA and node_idx_listB are None, simply do meshA + meshB - no point merging    
@@ -312,7 +220,9 @@ def MergeMesh(meshA, node_idx_listA, meshB, node_idx_listB, distance_threshold):
     meshAB=Mesh(nodeAB, elementAB, meshA.element_type, meshA.mesh_type)
     return meshAB
 #%%
-def RemoveUnusedNode(mesh, return_node_idx_list=False, clear_adj_info=True):
+MergeMesh=merge_mesh
+#%%
+def remove_unused_node(mesh, return_node_idx_list=False, clear_adj_info=True):
     #if a node does not belong to an element, then it is unused
     #this function may change the node order in mesh.node
     element=mesh.copy_element("list")
@@ -338,7 +248,9 @@ def RemoveUnusedNode(mesh, return_node_idx_list=False, clear_adj_info=True):
     if return_node_idx_list == True:
         return node_idx_list
 #%%
-def FindNearestNode(mesh, point, distance_threshold=np.inf):
+RemoveUnusedNode=remove_unused_node    
+#%%
+def find_nearest_node(mesh, point, distance_threshold=np.inf):
     #point (K, 3) or (3,)
     if not isinstance(point, (torch.Tensor, np.ndarray)):
         raise ValueError("unsupported type "+str(type(point)))
@@ -351,14 +263,16 @@ def FindNearestNode(mesh, point, distance_threshold=np.inf):
         p=point[n].view(1,-1)
         d=((mesh.node-p)**2).sum(dim=-1)
         idx=d.argmin()
-        if float(d[idx]) <= distance_threshold:
+        if float(d[idx]) <= distance_threshold**2:
             node_idx_list.append(int(idx))    
     if flag == False:
         return node_idx_list
     else:
         return node_idx_list[0]
 #%%
-def FindNeighborNode(mesh, node_idx, max_n_hop):
+FindNearestNode=find_nearest_node
+#%%
+def find_neighbor_node(mesh, node_idx, max_n_hop):
     if isinstance(node_idx, int):
         node_idx=[node_idx]
     elif isinstance(node_idx, tuple):
@@ -387,12 +301,5 @@ def FindNeighborNode(mesh, node_idx, max_n_hop):
         if n_hop >= max_n_hop:
             break
     return neighbor_node_list
-    
-        
-        
-        
-        
-    
-    
-    
-    
+#%%
+FindNeighborNode=find_neighbor_node

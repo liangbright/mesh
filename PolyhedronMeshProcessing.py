@@ -4,10 +4,7 @@ import numpy as np
 from PolyhedronMesh import PolyhedronMesh
 from TetrahedronMesh import TetrahedronMesh
 from HexahedronMesh import HexahedronMesh
-from Tet10Mesh import Tet10Mesh
-from copy import deepcopy
-from MeshProcessing import SimpleSmoother, SimpleSmootherForMesh, ComputeAngleBetweenTwoVectorIn3D, TracePolyline, \
-                            IsCurveClosed, MergeMesh, FindConnectedRegion, FindNearestNode
+from Tet10Mesh import Tet10Mesh                    
 from PolygonMeshProcessing import PolygonMesh, QuadMesh, TriangleMesh, Tri6Mesh                 
 #%%
 def ExtractSurfaceElement_slow(mesh):
@@ -62,15 +59,17 @@ def ExtractSurfaceElement_slow(mesh):
         surface_element.append(face[best_idx].tolist())
     return surface_element
 #%%
-def ExtractSurfaceElement(mesh):
+def extract_surface_element(mesh):
     #extract surface
     #surface normal is from inside to outside - this is ensured when each face is defined
     face_idx_list=mesh.find_boundary_face()
     surface_element=mesh.face[face_idx_list].tolist()
     return surface_element
 #%%
-def ExtractSurfaceMesh(mesh):
-    surface_element=ExtractSurfaceElement(mesh)
+ExtractSurfaceElement=extract_surface_element
+#%%
+def extract_surface_mesh(mesh):
+    surface_element=extract_surface_element(mesh)
     try:
         surface_element=torch.tensor(surface_element, dtype=torch.int64)
         if surface_element.shape[1] == 3:
@@ -88,3 +87,5 @@ def ExtractSurfaceMesh(mesh):
         temp_mesh=PolygonMesh(mesh.node, surface_element)
     surface_mesh=temp_mesh.get_sub_mesh(torch.arange(0, len(surface_element)).tolist())
     return surface_mesh
+#%%
+ExtractSurfaceMesh=extract_surface_mesh

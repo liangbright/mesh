@@ -4,7 +4,7 @@ import torch_scatter
 import numpy as np
 from PolygonMesh import PolygonMesh
 from QuadMesh import QuadMesh
-import PolygonMeshProcessing as pmp
+from GeometryUtility import cal_angle_between_3d_vector
 #%%
 class TriangleMesh(PolygonMesh):
     #3-node triangle element mesh
@@ -84,9 +84,9 @@ class TriangleMesh(PolygonMesh):
         #   x2
         #  /  \
         # x0--x1
-        angle0=pmp.ComputeAngleBetweenTwoVectorIn3D(x1-x0, x2-x0, return_cos)
-        angle1=pmp.ComputeAngleBetweenTwoVectorIn3D(x2-x1, x0-x1, return_cos)
-        angle2=pmp.ComputeAngleBetweenTwoVectorIn3D(x0-x2, x1-x2, return_cos)
+        angle0=cal_angle_between_3d_vector(x1-x0, x2-x0, return_cos)
+        angle1=cal_angle_between_3d_vector(x2-x1, x0-x1, return_cos)
+        angle2=cal_angle_between_3d_vector(x0-x2, x1-x2, return_cos)
         angle=torch.cat([angle0.reshape(-1,1), angle1.reshape(-1,1), angle2.reshape(-1,1)], dim=1)
         return angle
 

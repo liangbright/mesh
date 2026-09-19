@@ -13,7 +13,8 @@ class PolylineMesh(Mesh):
         super().__init__(node=node, element=element, element_type=None, mesh_type='polyline')        
 
     def initialize(self, curve_list):
-        #curve_list is a list of curves, each cure is a numpy/torch array
+        #curve_list is a list of curves or a 3D numpy/torch array
+        #curve_list[k] is a 2D numpy/torch array or a list of points
         if len(curve_list)==0:
             return
         node=[]
@@ -43,6 +44,30 @@ class PolylineMesh(Mesh):
         self.node=torch.tensor(node, dtype=dtype)
         self.element=element
     
+    @classmethod
+    def from_curve(cls, curve):
+        #curve may be
+        # a single curve: a 2D numpy/torch array or a list of points
+        # a list of curves = 3D array
+        if len(curve) == 0:
+            return cls()
+        if torch.is_tensor(curve) or isinstance(curve, np.ndarray):
+            if len(curve.shape) == 2:
+                curve_list=[curve]
+            elif len(curve.shape) == 3:
+                curve_list=curve
+            else:
+                raise ValueError
+        elif isinstance(curve, list) or isinstance(curve, tuple):
+            try:
+                temp=float(curve[0][0])
+                curve_list=[curve]
+            except:            
+                curve_list=curve            
+        poly_line_mesh = cls()
+        poly_line_mesh.initialize(curve_list)
+        return poly_line_mesh
+       
     def build_edge(self):
         self.build_element_to_edge_adj_table()
         

@@ -1,7 +1,7 @@
 import torch
 import numpy as np
-from PolygonMeshProcessing import PolygonMesh, QuadMesh, MergeMeshOnBoundary
-from HexahedronMesh import HexahedronMesh as HexMesh
+from PolygonMeshProcessing import PolygonMesh, QuadMesh, merge_mesh_on_boundary, simple_smoother_for_mesh
+from HexahedronMesh import HexahedronMesh as Hex8Mesh
 #%%
 def create_quad_cylinder_mesh(n_circles, n_points_per_circle, radius=1, height=1, dtype=torch.float32):
     theta=2*np.pi/n_points_per_circle
@@ -85,7 +85,7 @@ def create_hex_grid_mesh(Nx, Ny, Nz, dtype=torch.float32):
                 element[id,5]=map[z+1,y,x+1]
                 element[id,6]=map[z+1,y+1,x+1]
                 element[id,7]=map[z+1,y+1,x]
-    grid_mesh=HexMesh(grid, element)
+    grid_mesh=Hex8Mesh(grid, element)
     grid_mesh.node_set['boundary']=boundary
     return grid_mesh       
 #%%
@@ -98,11 +98,15 @@ def create_quad_mesh_rectangle_in_rectangle(n_rings=3, Nx=3, Ny=3, seal_hole=Tru
     # y
     #/|\
     # |
-    # D-----------C
-    # |    d_c    |
-    # |    |_|    |
-    # |    a b    |
-    # A-----------B--->x
+    # D--------C
+    # | \    / |
+    # |  d__c  |
+    # |  |__|  |
+    # |  a  b  |
+    # | /    \ |
+    # A--------B--->x
+    #note: A-B-C-D could deform into a circle, then the output is a quad mesh of rectangle in circle
+    #------------------------------------------------------------------------------------------------
     rect0_idx=(np.arange(0,Nx).tolist()+ [Nx-1+Nx*n for n in range(1, Ny)] + [Nx*Ny-1-n for n in range(1, Nx)]
                  + [Nx*(Ny-1)-Nx*n for n in range(1,Ny-1)])
     rect0=inner_mesh.node[rect0_idx]        
@@ -128,7 +132,7 @@ def create_quad_mesh_rectangle_in_rectangle(n_rings=3, Nx=3, Ny=3, seal_hole=Tru
     output_mesh=QuadMesh(node, element)
     element_counter_no_holes=len(element)
     if seal_hole == True:
-        output_mesh=MergeMeshOnBoundary([output_mesh, inner_mesh], distance_threshold=0.1/(max(Nx,Ny)*n_rings))
+        output_mesh=merge_mesh_on_boundary([output_mesh, inner_mesh], distance_threshold=0.1/(max(Nx,Ny)*n_rings))
         output_mesh=QuadMesh(output_mesh.node, output_mesh.element)
         output_mesh.element_set['hole']=np.arange(element_counter_no_holes, len(output_mesh.element)).tolist()
     A=(2*Nx+2*Ny-4)*(n_rings-1)
@@ -149,6 +153,59 @@ def create_quad_mesh_rectangle_in_rectangle(n_rings=3, Nx=3, Ny=3, seal_hole=Tru
     output_mesh.node_set["line_bc"]=np.arange(b, c+1).tolist()
     output_mesh.node_set["line_cd"]=np.arange(c, d+1).tolist()
     output_mesh.node_set["line_da"]=np.arange(d, d+Ny-1).tolist()+[a]    
+    return output_mesh
+#%%
+def create_quad_mesh_rectangle_in_cirlce(radius=1, n_rings=3, Nx=3, Ny=3, seal_hole=True):
+    output_mesh=create_quad_mesh_rectangle_in_rectangle(n_rings=n_rings, Nx=Nx, Ny=Ny, seal_hole=seal_hole)
+    # y
+    #/|\
+    # |
+    # D--------C
+    # | \    / |
+    # |  d__c  |
+    # |  |__|  |
+    # |  a  b  |
+    # | /    \ |
+    # A--------B--->x
+    #-------------------------------------------------------
+    output_mesh.node-=output_mesh.node.mean(dim=0, keepdim=True)
+    output_mesh.node/=output_mesh.node.max()
+    output_mesh.node*=radius*0.5
+    lineAB=output_mesh.node_set['lineAB']
+    for n in range(0, len(lineAB)):
+        theta=np.pi*(5/4)+np.pi*(1/2)*(n/(len(lineAB)-1))
+        x=radius*np.cos(theta)
+        y=radius*np.sin(theta)
+        output_mesh.node[lineAB[n],0]=x
+        output_mesh.node[lineAB[n],1]=y
+    lineBC=output_mesh.node_set['lineBC']
+    for n in range(0, len(lineBC)):
+        theta=np.pi*(7/4)+np.pi*(1/2)*(n/(len(lineBC)-1))
+        x=radius*np.cos(theta)
+        y=radius*np.sin(theta)
+        output_mesh.node[lineBC[n],0]=x
+        output_mesh.node[lineBC[n],1]=y
+    lineCD=output_mesh.node_set['lineCD']
+    for n in range(0, len(lineCD)):
+        theta=np.pi*(1/4)+np.pi*(1/2)*(n/(len(lineCD)-1))
+        x=radius*np.cos(theta)
+        y=radius*np.sin(theta)
+        output_mesh.node[lineCD[n],0]=x
+        output_mesh.node[lineCD[n],1]=y
+    lineDA=output_mesh.node_set['lineDA']
+    for n in range(0, len(lineDA)):
+        theta=np.pi*(3/4)+np.pi*(1/2)*(n/(len(lineDA)-1))
+        x=radius*np.cos(theta)
+        y=radius*np.sin(theta)
+        output_mesh.node[lineDA[n],0]=x
+        output_mesh.node[lineDA[n],1]=y
+    #------------------------------------------------------
+    mask=torch.ones(output_mesh.node.shape[0], dtype=output_mesh.node.dtype)    
+    mask[lineAB]=0
+    mask[lineBC]=0
+    mask[lineCD]=0
+    mask[lineDA]=0
+    simple_smoother_for_mesh(output_mesh, 0.5, mask, n_iters=(n_rings+Nx+Ny)*10)
     return output_mesh
 #%%
 def create_quad_tri_mesh_circle_in_circle(n_circles=3, n_points_per_circle=11, radius=1, seal_hole=True):

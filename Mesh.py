@@ -2,9 +2,9 @@ import torch
 from torch.linalg import vector_norm as norm
 import numpy as np
 from copy import deepcopy
-from SaveMeshAsVTKFile import (save_polyline_mesh_to_vtk, 
-                               save_polygon_mesh_to_vtk, 
-                               save_polyhedron_mesh_to_vtk)
+from SaveMeshAsVTKFile import (save_polyline_mesh_as_vtk, 
+                               save_polygon_mesh_as_vtk, 
+                               save_polyhedron_mesh_as_vtk)
 import os
 _Flag_VTK_IMPORT_=False
 try:
@@ -108,10 +108,11 @@ class Mesh:
             self.element_to_element_adj_table={'node':None, 'edge':None, 'face':None}
 
     def load_from_stl(self, filename, dtype):
-        if not os.path.isfile(filename):
-            raise ValueError('not exist: '+filename)
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError('vtk is not imported')
+        if not os.path.isfile(filename):
+            raise ValueError('not exist: '+filename)
+        self.clear_adj_info()        
         if isinstance(dtype, str):
             if dtype == 'float32':
                 dtype=torch.float32
@@ -129,10 +130,11 @@ class Mesh:
         self.read_mesh_vtk(mesh_vtk, dtype)
     
     def load_from_vtp(self, filename, dtype):
-        if not os.path.isfile(filename):
-            raise ValueError('not exist: '+filename)
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError('vtk is not imported')
+        if not os.path.isfile(filename):
+            raise ValueError('not exist: '+filename)
+        self.clear_adj_info()        
         if isinstance(dtype, str):
             if dtype == 'float32':
                 dtype=torch.float32
@@ -154,10 +156,10 @@ class Mesh:
 
     @staticmethod
     def load_vtk_file(filename, mesh_type):
-        if not os.path.isfile(filename):
-            raise ValueError('not exist: '+filename)
         if _Flag_VTK_IMPORT_ == False:
-            raise ValueError('vtk is not imported')        
+            raise ValueError('vtk is not imported')
+        if not os.path.isfile(filename):
+            raise ValueError('not exist: '+filename)        
         if 'polyhedron' in mesh_type:
             reader = vtk.vtkUnstructuredGridReader()
         elif 'polygon' in mesh_type:
@@ -175,6 +177,9 @@ class Mesh:
         return mesh_vtk
     
     def load_from_vtk(self, filename, dtype, return_mesh_vtk=False):
+        if not os.path.isfile(filename):
+            raise ValueError('not exist: '+filename)
+        self.clear_adj_info()
         if isinstance(dtype, str):
             if dtype == 'float32':
                 dtype=torch.float32
@@ -364,18 +369,18 @@ class Mesh:
             use_vtk=False
         if use_vtk == False:
             if 'polyhedron' in self.mesh_type:
-                save_polyhedron_mesh_to_vtk(self, filename)
+                save_polyhedron_mesh_as_vtk(self, filename)
                 if vtk42 == False:
                     print('Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False')
             elif 'polygon' in self.mesh_type:
                 if ('tri6' in self.mesh_type) or ('quad8' in self.mesh_type):
                     raise ValueError('unsupported mesh_type: '+self.mesh_type)
                 else:
-                    save_polygon_mesh_to_vtk(self, filename)
+                    save_polygon_mesh_as_vtk(self, filename)
                     if vtk42 == False:
                         print('Mesh save_as_vtk: can only save to 4.2 version vtk, although vtk42=False')
             elif 'polyline' in self.mesh_type:
-                save_polyline_mesh_to_vtk(self, filename)
+                save_polyline_mesh_as_vtk(self, filename)
             else:
                 raise ValueError('unsupported mesh_type: '+self.mesh_type)
             return
@@ -453,6 +458,7 @@ class Mesh:
     def load_from_torch(self, filename):
         if not os.path.isfile(filename):
             raise ValueError('not exist: '+filename)
+        self.clear_adj_info()
         data=torch.load(filename, map_location='cpu', weights_only=False)
         if 'node' in data.keys():
             self.node=data['node']
@@ -503,8 +509,40 @@ class Mesh:
                 self.face_to_element_adj_table=data['face_to_element_adj_table']
             if 'element_to_face_adj_table' in data.keys():
                 self.element_to_face_adj_table=data['element_to_face_adj_table']
-
+    
+    def save(self, filename):
+        filenamebase, file_type = os.path.splitext(filename)
+        if file_type == '.vtk':
+            self.save_as_vtk(filename)
+        elif  file_type == '.vtp':
+            self.save_as_vtp(filename)
+        elif file_type == '.pt' or file_type == '.pth':
+            self.save_as_torch(filename, True)
+        else:
+            raise ValueError('unknown file_type:'+file_type)
+    
+    def load(self, filename, dtype=None):
+        if not os.path.isfile(filename):
+            raise ValueError('not exist: '+filename)
+        self.clear_adj_info()
+        if dtype is None:
+            dtype='float32'
+        filenamebase, file_type = os.path.splitext(filename)
+        if file_type == '.vtk':
+            self.load_from_vtk(filename, dtype)
+        elif  file_type == '.vtp':
+            self.load_from_vtp(filename, dtype)
+        elif  file_type == '.stl':
+            self.load_from_stl(filename, dtype)
+        elif file_type == '.pt' or file_type == '.pth':
+            self.load_from_torch(filename)
+            if dtype is not None:
+                print('warning: dtype is not None and it is ignored @ mesh.load')
+        else:
+            raise ValueError('unknown file_type:'+file_type)
+            
     def copy(self, node, element, dtype=None, detach=True):
+        self.clear_adj_info()
         if isinstance(node, torch.Tensor):
             if dtype is None:
                 self.node=node.clone()

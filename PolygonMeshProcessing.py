@@ -9,6 +9,11 @@ from Tri6Mesh import Tri6Mesh
 from QuadMesh import QuadMesh
 from QuadTriangleMesh import QuadTriangleMesh
 from copy import deepcopy
+from MeshProcessing import (simple_smoother, simple_smoother_for_mesh,
+                            cal_angle_between_3d_vector, trace_polyline,
+                            is_curve_closed, merge_mesh,
+                            find_connected_region, find_nearest_node, segment_mesh_to_connected_region,
+                            find_neighbor_node)
 from MeshProcessing import (SimpleSmoother, SimpleSmootherForMesh,
                             ComputeAngleBetweenTwoVectorIn3D, TracePolyline,
                             IsCurveClosed, MergeMesh,
@@ -19,7 +24,7 @@ try:
 except:
     print("cannot import vtk")
 #%%
-def TraceMeshBoundaryCurve(mesh, start_node_idx, next_node_idx=None, end_node_idx=None):
+def trace_mesh_boundary_curve(mesh, start_node_idx, next_node_idx=None, end_node_idx=None):
     #trace boundary starting from start_node_idx -> next_node_idx -> ...
     #this function may not work well if two boundary curves share points
     if not isinstance(mesh, PolygonMesh):
@@ -77,8 +82,10 @@ def TraceMeshBoundaryCurve(mesh, start_node_idx, next_node_idx=None, end_node_id
         if flag == False:
             break
     return BoundaryCurve
+#%% old name
+TraceMeshBoundaryCurve=trace_mesh_boundary_curve
 #%%
-def FindMeshBoundaryCurve(mesh):
+def find_mesh_boundary_curve(mesh):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     node_idx_list=mesh.find_boundary_node()
@@ -90,8 +97,10 @@ def FindMeshBoundaryCurve(mesh):
         BoundaryCurveList.append(BoundaryCurve)
         node_idx_list=list(set(node_idx_list)-set(BoundaryCurve))
     return BoundaryCurveList
+#%% old name
+FindMeshBoundaryCurve=find_mesh_boundary_curve
 #%%
-def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx, max_n_elements=float('inf')):
+def extract_region_enclosed_by_curve(mesh, node_curve_list, inner_element_idx, max_n_elements=float('inf')):
     #node_curve_list[k] is a curve - represented by a list/array of node indexes on mesh
     #the combined curve (from curve_list[0] to curve_list[-1]) is closed
     #inner_element_idx is the index of an element inside the region
@@ -103,7 +112,7 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx, max_n
     for k in range(0, len(node_curve_list)):
         curve_k=[int(x) for x in node_curve_list[k]]
         curve.extend(curve_k)
-    flag_close, idx_bad=IsCurveClosed(mesh, curve)
+    flag_close, idx_bad=is_curve_closed(mesh, curve)
     if not flag_close:
         #raise ValueError('curve is not closed at node '+str(idx_bad))
         print('curve may be open or self-intersect at node '+str(idx_bad)+" @ ExtractRegionEnclosedByCurve")
@@ -163,8 +172,10 @@ def ExtractRegionEnclosedByCurve(mesh, node_curve_list, inner_element_idx, max_n
     #--------------
     # indexes of elements in the region
     return region_element_list  
+#%% old name
+ExtractRegionEnclosedByCurve=extract_region_enclosed_by_curve
 #%%
-def SegmentMeshByCurve(mesh, node_curve_list):
+def segment_mesh_by_curve(mesh, node_curve_list):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     element_list=np.arange(0, len(mesh.element)).tolist()
@@ -176,20 +187,24 @@ def SegmentMeshByCurve(mesh, node_curve_list):
         region_list.append(region)
         element_list=list(set(element_list)-set(region))
     return region_list
+#%% old name
+SegmentMeshByCurve=segment_mesh_by_curve
 #%%
-def MergeMeshOnBoundary(mesh_list, distance_threshold):
+def merge_mesh_on_boundary(mesh_list, distance_threshold):
     merged_mesh=mesh_list[0]
     for n in range(1, len(mesh_list)):
         mesh_n=mesh_list[n]
         if not isinstance(mesh_n, PolygonMesh):
             raise NotImplementedError
-        merged_mesh=MergeMesh(merged_mesh, merged_mesh.find_boundary_node(),
-                              mesh_n, mesh_n.find_boundary_node(),
-                              distance_threshold)
+        merged_mesh=merge_mesh(merged_mesh, merged_mesh.find_boundary_node(),
+                               mesh_n, mesh_n.find_boundary_node(),
+                               distance_threshold)
         merged_mesh=PolygonMesh(merged_mesh.node, merged_mesh.element)
     return merged_mesh
+#%% old name
+MergeMeshOnBoundary=merge_mesh_on_boundary
 #%%
-def SimpleSmootherForMeshNodeNormal(mesh, lamda, mask, n_iters, update_node_normal=True):
+def simple_smoother_for_mesh_node_normal(mesh, lamda, mask, n_iters, update_node_normal=True):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     if update_node_normal == True:
@@ -199,14 +214,16 @@ def SimpleSmootherForMeshNodeNormal(mesh, lamda, mask, n_iters, update_node_norm
         mesh.build_node_to_node_adj_link()
     adj_link=mesh.node_to_node_adj_link
     for n in range(0, n_iters):
-        SimpleSmoother(node_normal, adj_link, lamda, mask, inplace=True)
+        simple_smoother(node_normal, adj_link, lamda, mask, inplace=True)
         normal_norm=norm(node_normal, ord=2, dim=1, keepdim=True)
         normal_norm=normal_norm.clamp(min=1e-12)
         node_normal=node_normal/normal_norm
     node_normal=node_normal.contiguous()
     mesh.node_normal=node_normal
+#%% old name
+SimpleSmootherForMeshNodeNormal=simple_smoother_for_mesh_node_normal
 #%%
-def SimpleSmootherForMeshElementNormal(mesh, lamda, mask, n_iters, update_element_normal=True):
+def simple_smoother_for_mesh_element_normal(mesh, lamda, mask, n_iters, update_element_normal=True):
     if not isinstance(mesh, PolygonMesh):
         raise NotImplementedError
     if update_element_normal == True:
@@ -216,14 +233,16 @@ def SimpleSmootherForMeshElementNormal(mesh, lamda, mask, n_iters, update_elemen
         mesh.build_element_to_element_adj_link('node')
     adj_link=mesh.element_to_element_adj_link['node']
     for n in range(0, n_iters):
-        SimpleSmoother(element_normal, adj_link, lamda, mask, inplace=True)
+        simple_smoother(element_normal, adj_link, lamda, mask, inplace=True)
         normal_norm=norm(element_normal, ord=2, dim=1, keepdim=True)
         normal_norm=normal_norm.clamp(min=1e-12)
         element_normal=element_normal/normal_norm
     element_normal=element_normal.contiguous()
-    mesh.element_normal=element_normal    
+    mesh.element_normal=element_normal
+#%% old name
+SimpleSmootherForMeshElementNormal=simple_smoother_for_mesh_element_normal
 #%%
-def SimpleSmootherForQuadMesh(mesh, lamda, mask, n_iters):
+def simple_smoother_for_quad_mesh(mesh, lamda, mask, n_iters):
     if not isinstance(mesh, QuadMesh):
         raise NotImplementedError
     if mesh.node_to_element_adj_table is None:
@@ -244,14 +263,16 @@ def SimpleSmootherForQuadMesh(mesh, lamda, mask, n_iters):
         adj_link=torch.unique(adj_link, dim=0, sorted=True)
         mesh.mesh_data['quad_node_to_node_adj_link']=adj_link
     for n in range(0, n_iters):
-        SimpleSmoother(mesh.node, adj_link, lamda, mask, inplace=True)
+        simple_smoother(mesh.node, adj_link, lamda, mask, inplace=True)
+#%% old name
+SimpleSmootherForQuadMesh=simple_smoother_for_quad_mesh
 #%%
 #dtype is a necessary parameter of a function that is based on vtk functions
 # function(mesh, mesh_vtk, dtype) where mesh_vtk is the output of some vtk function and mesh does not exist
 #%%
-def CutMeshByCurve(mesh, curve, point_ref, straight_cut=False, return_unselected=False, 
-                   clean_output=False, eps=1e-5, triangulate_output=False, mesh_vtk=None, dtype=None,
-                   threshold=0):
+def cut_mesh_by_curve(mesh, curve, point_ref, straight_cut=False, return_unselected=False, 
+                      clean_output=False, eps=1e-5, triangulate_output=False, mesh_vtk=None, dtype=None,
+                      threshold=0):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     if dtype is None:
@@ -311,7 +332,7 @@ def CutMeshByCurve(mesh, curve, point_ref, straight_cut=False, return_unselected
         output_mesh=PolygonMesh()
         output_mesh.read_mesh_vtk(output_vtk, dtype)
     else:
-        output_mesh=ConvertPolygonMeshToTriangleMesh(None, output_vtk, dtype)
+        output_mesh=convert_polygon_mesh_to_triangle_mesh(None, output_vtk, dtype)
     if return_unselected == False:
         return output_mesh
     #----------------------------------------
@@ -327,10 +348,21 @@ def CutMeshByCurve(mesh, curve, point_ref, straight_cut=False, return_unselected
         unselected_output_mesh=PolygonMesh()
         unselected_output_mesh.read_mesh_vtk(unselected_output_vtk, dtype)
     else:
-        unselected_output_mesh=ConvertPolygonMeshToTriangleMesh(None, unselected_output_vtk, dtype)
+        unselected_output_mesh=convert_polygon_mesh_to_triangle_mesh(None, unselected_output_vtk, dtype)
     return output_mesh, unselected_output_mesh
+#%% old name
+CutMeshByCurve=cut_mesh_by_curve
 #%%
-def ProjectPointToMesh(mesh, point, mesh_vtk=None, dtype=None):
+def project_point_to_mesh(point, mesh, mesh_vtk=None, dtype=None):
+    #---------------
+    #the orignal function is (mesh, point, ...)
+    #to be backward compatible
+    arg1=point
+    arg2=mesh
+    if torch.is_tensor(arg2) or isinstance(arg2, np.ndarray()):
+        point=arg2
+        mesh=arg1
+    #---------------
     #point (N, 3)
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -366,8 +398,10 @@ def ProjectPointToMesh(mesh, point, mesh_vtk=None, dtype=None):
         element_proj.append(int(cellId))
     point_proj=torch.tensor(point_proj, dtype=dtype)
     return point_proj, element_proj
+#%% old name
+ProjectPointToMesh=project_point_to_mesh
 #%%
-def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mesh_fixed_vtk=None, smooth_first=True):
+def smooth_and_project(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mesh_fixed_vtk=None, smooth_first=True):
     #smooth mesh_move and project it to mesh_fixed
     #mesh_move.node is modified
     #mesh_fixed must be a triangle mesh
@@ -375,18 +409,28 @@ def SmoothAndProject(mesh_move, mesh_fixed, lamda, mask, n1_iters, n2_iters, mes
         mesh_fixed_vtk=mesh_fixed.convert_to_vtk()
     for k in range(0, n2_iters):
         if smooth_first == True:
-            SimpleSmootherForMesh(mesh_move, lamda, mask, n1_iters)
-        node_proj, element_proj=ProjectPointToMesh(mesh_fixed, mesh_move.node, mesh_fixed_vtk)        
+            simple_smoother_for_mesh(mesh_move, lamda, mask, n1_iters)
+        node_proj, element_proj=project_point_to_mesh(mesh_move.node, mesh_fixed, mesh_fixed_vtk)        
         temp=mask.view(-1)
         mesh_move.node[temp>0]=node_proj[temp>0]
         if smooth_first == False and k < n2_iters-1:
-            SimpleSmootherForMesh(mesh_move, lamda, mask, n1_iters)
+            simple_smoother_for_mesh(mesh_move, lamda, mask, n1_iters)
+#%% old name
+SmoothAndProject=smooth_and_project            
 #%%
-def ChamferDistance(meshA, meshB, reduction):
+def cal_point_to_mesh_distance(point, mesh, mesh_vtk=None, dtype=None):
     #this function is not differentiable
-    #perhaps, we should not name it ChamferDistance
-    nodeB_proj, __=ProjectPointToMesh(meshA, meshB.node)
-    nodeA_proj, __=ProjectPointToMesh(meshB, meshA.node)
+    point_proj, __=project_point_to_mesh(point, mesh, mesh_vtk, dtype)    
+    dist=((point-point_proj)**2).sum(dim=1).sqrt()
+    return dist
+#%% old name
+PointToMeshDistance=cal_point_to_mesh_distance
+#%%
+def cal_mesh_to_mesh_distance(meshA, meshB, reduction):
+    #this function is not differentiable
+    #ChamferDistance: distance between two sets of points
+    nodeB_proj, __=project_point_to_mesh(meshB.node, meshA)
+    nodeA_proj, __=project_point_to_mesh(meshA.node, meshB)
     distA=((meshA.node-nodeA_proj)**2).sum(dim=1).sqrt()
     distB=((meshB.node-nodeB_proj)**2).sum(dim=1).sqrt()
     if reduction == 'none':
@@ -395,8 +439,10 @@ def ChamferDistance(meshA, meshB, reduction):
         return 0.5*(distA.mean()+distB.mean())
     else:
         raise ValueError
+#%% old name
+MeshToMeshDistance=cal_mesh_to_mesh_distance        
 #%%
-def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None, dtype=None):
+def convert_polygon_mesh_to_triangle_mesh(mesh, mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     if dtype is None:
@@ -411,8 +457,10 @@ def ConvertPolygonMeshToTriangleMesh(mesh, mesh_vtk=None, dtype=None):
     output_mesh.read_mesh_vtk(trifilter.GetOutput(), dtype)
     return output_mesh
 #%%
-def ClipMeshByPlane(mesh, origin, normal, return_clipped_output=False, clean_output=False, eps=1e-5,
-                    triangulate_output=False, mesh_vtk=None, dtype=None):
+ConvertPolygonMeshToTriangleMesh=convert_polygon_mesh_to_triangle_mesh
+#%%
+def clip_mesh_by_plane(mesh, origin, normal, return_clipped_output=False, clean_output=False, eps=1e-5,
+                       triangulate_output=False, mesh_vtk=None, dtype=None):
     #origin and normal define the cut plane
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -444,7 +492,7 @@ def ClipMeshByPlane(mesh, origin, normal, return_clipped_output=False, clean_out
         output_mesh=PolygonMesh()
         output_mesh.read_mesh_vtk(output_vtk, dtype)
     else:
-        output_mesh=ConvertPolygonMeshToTriangleMesh(None, output_vtk, dtype)
+        output_mesh=convert_polygon_mesh_to_triangle_mesh(None, output_vtk, dtype)
     if return_clipped_output == False:
         return output_mesh
     #----------------------------------------
@@ -461,12 +509,14 @@ def ClipMeshByPlane(mesh, origin, normal, return_clipped_output=False, clean_out
         clipped_output_mesh=PolygonMesh()
         clipped_output_mesh.read_mesh_vtk(clipped_output_vtk, dtype)
     else:
-        clipped_output_mesh=ConvertPolygonMeshToTriangleMesh(None, clipped_output_vtk, dtype)
+        clipped_output_mesh=convert_polygon_mesh_to_triangle_mesh(None, clipped_output_vtk, dtype)
     return output_mesh, clipped_output_mesh
+#%% old name
+ClipMeshByPlane=clip_mesh_by_plane
 #%%
-def ClipMeshByAttribute(mesh, attribute_threshold, node_attribute_name=None, element_attribute_name=None,
-                        invert=True, return_clipped_output=False, clean_output=False, eps=1e-5,
-                        triangulate_output=False, mesh_vtk=None, dtype=None):
+def clip_mesh_by_attribute(mesh, attribute_threshold, node_attribute_name=None, element_attribute_name=None,
+                           invert=True, return_clipped_output=False, clean_output=False, eps=1e-5,
+                           triangulate_output=False, mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     if dtype is None:
@@ -508,7 +558,7 @@ def ClipMeshByAttribute(mesh, attribute_threshold, node_attribute_name=None, ele
         output_mesh=PolygonMesh()
         output_mesh.read_mesh_vtk(output_vtk, dtype)
     else:
-        output_mesh=ConvertPolygonMeshToTriangleMesh(None, output_vtk, dtype)
+        output_mesh=convert_polygon_mesh_to_triangle_mesh(None, output_vtk, dtype)
     if return_clipped_output == False:
         return output_mesh
     #----------------------------------------
@@ -525,10 +575,12 @@ def ClipMeshByAttribute(mesh, attribute_threshold, node_attribute_name=None, ele
         clipped_output_mesh=PolygonMesh()
         clipped_output_mesh.read_mesh_vtk(clipped_output_vtk, dtype)
     else:
-        clipped_output_mesh=ConvertPolygonMeshToTriangleMesh(None, clipped_output_vtk, dtype)
+        clipped_output_mesh=convert_polygon_mesh_to_triangle_mesh(None, clipped_output_vtk, dtype)
     return output_mesh, clipped_output_mesh
+#%% old name
+ClipMeshByAttribute=clip_mesh_by_attribute
 #%%
-def SliceMeshByPlane(mesh, origin, normal, clean_output=False, eps=1e-5, mesh_vtk=None, dtype=None):
+def slice_mesh_by_plane(mesh, origin, normal, clean_output=False, eps=1e-5, mesh_vtk=None, dtype=None):
     #similar to slice function in paraview
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -563,7 +615,9 @@ def SliceMeshByPlane(mesh, origin, normal, clean_output=False, eps=1e-5, mesh_vt
     output_mesh.read_mesh_vtk(output_vtk, dtype=dtype)
     return output_mesh
 #%%
-def ComputeCurvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
+SliceMeshByPlane=slice_mesh_by_plane
+#%%
+def cal_curvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
     if dtype is None:
@@ -596,8 +650,10 @@ def ComputeCurvature(mesh, curvature_name='mean', mesh_vtk=None, dtype=None):
     for i in range(0, curvature.shape[0]):
         curvature[i]=data.GetComponent(i,0)
     return curvature
+#%% old name
+ComputeCurvature=cal_curvature
 #%%
-def FillHole(mesh, hole_size, clean_output=False, eps=1e-5, triangulate_output=False, mesh_vtk=None, dtype=None):
+def fill_hole(mesh, hole_size, clean_output=False, eps=1e-5, triangulate_output=False, mesh_vtk=None, dtype=None):
     #make a watertight mesh
     if mesh_vtk is None:
         mesh_vtk=mesh.convert_to_vtk()
@@ -629,10 +685,12 @@ def FillHole(mesh, hole_size, clean_output=False, eps=1e-5, triangulate_output=F
         output_mesh=PolygonMesh()
         output_mesh.read_mesh_vtk(output_vtk, dtype)
     else:
-        output_mesh=ConvertPolygonMeshToTriangleMesh(None, output_vtk, dtype)
+        output_mesh=convert_polygon_mesh_to_triangle_mesh(None, output_vtk, dtype)
     return output_mesh
+#%% old name
+FillHole=fill_hole
 #%%
-def FindDijkstraGraphGeodesicPath(mesh, start_node_idx, end_node_idx, mesh_vtk=None, dtype=None):
+def find_dijkstra_graph_geodesic_path(mesh, start_node_idx, end_node_idx, mesh_vtk=None, dtype=None):
     if mesh.is_tri() == False:
         raise ValueError('only support triangle mesh')
     if mesh_vtk is None:
@@ -654,10 +712,12 @@ def FindDijkstraGraphGeodesicPath(mesh, start_node_idx, end_node_idx, mesh_vtk=N
         path[n,0]=p[0]
         path[n,1]=p[1]
         path[n,2]=p[2]
-    node_idx_list=FindNearestNode(mesh, path)    
+    node_idx_list=find_nearest_node(mesh, path)    
     return node_idx_list
+#%% old name
+FindDijkstraGraphGeodesicPath=find_dijkstra_graph_geodesic_path
 #%%
-def Subdivision(mesh, n_subdivisions, method='linear', mesh_vtk=None, dtype=None):
+def subdivide(mesh, n_subdivisions, method='linear', mesh_vtk=None, dtype=None):
     #method: 
     # linear-> vtkLinearSubdivisionFilter
     # loop -> vtkLoopSubdivisionFilter
@@ -689,3 +749,5 @@ def Subdivision(mesh, n_subdivisions, method='linear', mesh_vtk=None, dtype=None
     output_mesh=PolygonMesh()
     output_mesh.read_mesh_vtk(filter.GetOutput(), dtype)
     return output_mesh
+#%% old name
+Subdivision=subdivide

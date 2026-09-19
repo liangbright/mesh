@@ -7,7 +7,7 @@ Created on Sun Jun 26 22:54:53 2022
 
 import torch
 #%%
-def save_polyline_mesh_to_vtk(mesh, filename):
+def save_polyline_mesh_as_vtk(mesh, filename):
     element=mesh.element
     node=mesh.node
     node_data=mesh.node_data
@@ -58,7 +58,7 @@ def save_polyline_mesh_to_vtk(mesh, filename):
     with open(filename, 'w', encoding = 'utf-8') as file:
         file.writelines(out) 
 #%%
-def save_polygon_mesh_to_vtk(mesh, filename):
+def save_polygon_mesh_as_vtk(mesh, filename):
     out=[]
     out.append('# vtk DataFile Version 4.2'+'\n')
     out.append('vtk output'+'\n')
@@ -118,7 +118,7 @@ def save_polygon_mesh_to_vtk(mesh, filename):
     with open(filename, 'w', encoding = 'utf-8') as file:
         file.writelines(out)
 #%%
-def save_polyhedron_mesh_to_vtk(mesh, filename):
+def save_polyhedron_mesh_as_vtk(mesh, filename):
     out=[]
     out.append('# vtk DataFile Version 4.2'+'\n')
     out.append('vtk output'+'\n')

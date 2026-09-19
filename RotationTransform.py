@@ -16,6 +16,8 @@ class RotationTransform3D(nn.Module):
     
     @staticmethod
     def cal_R(angle):
+        #angle=[angle_x, angle_y, angle_z]
+        #R=Rz*Ry*Rx
         a=angle[0]
         b=angle[1]
         c=angle[2]

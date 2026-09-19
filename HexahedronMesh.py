@@ -5,11 +5,11 @@ Created on Sat Mar 27 22:24:13 2021
 @author: liang
 """
 import torch
-import torch_scatter
-from torch_sparse import SparseTensor
+#import torch_scatter
+#from torch_sparse import SparseTensor
 import numpy as np
-import json
-from torch.linalg import det, cross
+#import json
+from torch.linalg import cross
 from PolyhedronMesh import PolyhedronMesh
 #%%
 class HexahedronMesh(PolyhedronMesh):
@@ -94,17 +94,11 @@ class HexahedronMesh(PolyhedronMesh):
         x6=node[element[:,6]]
         x7=node[element[:,7]]
         volume=(cal_vol(x1,x2,x3,x5)
-               +cal_vol(x1,x5,x2,x3)
                +cal_vol(x4,x7,x5,x3)
-               +cal_vol(x3,x7,x4,x5)
                +cal_vol(x0,x4,x5,x3)
-               +cal_vol(x0,x3,x4,x5)
                +cal_vol(x2,x5,x6,x3)
-               +cal_vol(x2,x6,x3,x5)
                +cal_vol(x5,x7,x6,x3)
-               +cal_vol(x3,x6,x7,x5)
-               +cal_vol(x0,x5,x1,x3)
-               +cal_vol(x0,x1,x3,x5))
+               +cal_vol(x0,x5,x1,x3))
         return volume
 
     def subdivide(self):

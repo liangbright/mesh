@@ -7,14 +7,47 @@ Created on Tue Nov  7 19:52:22 2023
 import numpy as np
 import torch
 
-def save_curve_as_vtk(curve_list, filename):
-    if not isinstance(curve_list, list):
-        raise ValueError('input curve_list must be a list')
+def save_curve_as_vtk(curve, filename):
+    #curve may be
+    # a single curve: a 2D numpy/torch array or a list of points
+    # a list of curves = 3D array    
+    if len(curve) == 0:
+        return
+    if torch.is_tensor(curve) or isinstance(curve, np.ndarray):
+        if len(curve.shape) == 2:
+            curve_list=[curve]
+        elif len(curve.shape) == 3:
+            curve_list=curve
+        else:
+            raise ValueError
+    elif isinstance(curve, list) or isinstance(curve, tuple):
+        try:
+            temp=float(curve[0][0])
+            curve_list=[curve]
+        except:            
+            curve_list=curve
     node, line=convert_curve_to_polyline(curve_list)
     save_polyline_as_vtk(filename, node, line)
 
-def convert_curve_to_polyline(curve_list):
-    #curve_list is a list of curves, each cure is a numpy array
+def convert_curve_to_polyline(curve):
+    #curve may be
+    # a single curve: a 2D numpy/torch array or a list of points
+    # a list of curves = 3D array    
+    if len(curve) == 0:
+        return
+    if torch.is_tensor(curve) or isinstance(curve, np.ndarray):
+        if len(curve.shape) == 2:
+            curve_list=[curve]
+        elif len(curve.shape) == 3:
+            curve_list=curve
+        else:
+            raise ValueError
+    elif isinstance(curve, list) or isinstance(curve, tuple):
+        try:
+            temp=float(curve[0][0])
+            curve_list=[curve]
+        except:            
+            curve_list=curve
     node=[]
     line=[]
     for k in range(0, len(curve_list)):

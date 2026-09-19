@@ -192,7 +192,7 @@ class QuadMesh(PolygonMesh):
         return flatness
        
     def sample_point(self, n_point):
-         return QuadMesh.sample_point(self.node, self.element, n_point)
+         return QuadMesh.uniformly_sample_point(self.node, self.element, n_point)
 
     @staticmethod
     def uniformly_sample_point(node, element, n_point):
@@ -283,7 +283,7 @@ if __name__ == "__main__":
     #%%
     wall.update_element_area_and_normal()
     #%%
-    points=wall.sample_points_on_elements(10*len(wall.node))
+    points=wall.sample_point(10*len(wall.node))
     #%%
     wall_new=wall.subdivide()
     wall_new.save_by_vtk("wall_new.vtk")

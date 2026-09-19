@@ -130,11 +130,11 @@ def create_quad_mesh_rectangle_in_rectangle(n_ring=3, Nx=3, Ny=3, seal_hole=True
                 idx3=(n-1)*K+m
             element.append([idx0, idx1, idx2, idx3])
     output_mesh=QuadMesh(node, element)
-    element_counter_no_holes=len(element)
+    element_counter_no_hole=len(element)
     if seal_hole == True:
         output_mesh=merge_mesh_on_boundary([output_mesh, inner_mesh], distance_threshold=0.1/(max(Nx,Ny)*n_ring))
         output_mesh=QuadMesh(output_mesh.node, output_mesh.element)
-        output_mesh.element_set['hole']=np.arange(element_counter_no_holes, len(output_mesh.element)).tolist()
+        output_mesh.element_set['hole']=np.arange(element_counter_no_hole, len(output_mesh.element)).tolist()
     A=(2*Nx+2*Ny-4)*(n_ring-1)
     B=A+Nx-1
     C=B+Ny-1
@@ -205,7 +205,7 @@ def create_quad_mesh_rectangle_in_cirlce(radius=1, n_ring=3, Nx=3, Ny=3, seal_ho
     mask[lineBC]=0
     mask[lineCD]=0
     mask[lineDA]=0
-    simple_smoother_for_mesh(output_mesh, 0.5, mask, n_iters=(n_ring+Nx+Ny)*10)
+    simple_smoother_for_mesh(output_mesh, 0.5, mask, n_iter=(n_ring+Nx+Ny)*10)
     return output_mesh
 #%%
 def create_quad_tri_mesh_circle_in_circle(n_circle=3, n_point_per_circle=11, radius=1, seal_hole=True):
@@ -224,7 +224,7 @@ def create_quad_tri_mesh_circle_in_circle(n_circle=3, n_point_per_circle=11, rad
         for i in range(0, n_point_per_circle-1):
             element.append([idxA[i], idxA[i+1], idxB[i+1], idxB[i]])
         element.append([idxA[n_point_per_circle-1], idxA[0], idxB[0], idxB[n_point_per_circle-1]])
-    element_counter_no_holes=len(element)
+    element_counter_no_hole=len(element)
     if seal_hole == True:
         node.append([0,0,0])
         center_idx=len(node)-1
@@ -233,7 +233,7 @@ def create_quad_tri_mesh_circle_in_circle(n_circle=3, n_point_per_circle=11, rad
             element.append([center_idx, curve[k], curve[k+1]])
         element.append([center_idx, curve[len(curve)-1], curve[0]])
     output_mesh=PolygonMesh(node, element)
-    output_mesh.element_set['hole']=np.arange(element_counter_no_holes, len(output_mesh.element)).tolist()
+    output_mesh.element_set['hole']=np.arange(element_counter_no_hole, len(output_mesh.element)).tolist()
     output_mesh.node_set['boundary']=np.arange(0, n_point_per_circle).tolist()
     return output_mesh
 #%%

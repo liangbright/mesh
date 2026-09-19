@@ -257,7 +257,7 @@ if __name__ == "__main__":
     #%%
     wall.update_element_area_and_normal()
     #%%
-    points=wall.sample_points_on_elements(10*len(wall.node))
+    points=wall.sample_point(10*len(wall.node))
     #%%
     wall_sub=wall.get_sub_mesh(torch.arange(0,100))
     wall_sub.save_by_vtk("wall_tri_sub.vtk")

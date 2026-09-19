@@ -151,17 +151,17 @@ def save_polyhedron_mesh_as_vtk(mesh, filename):
     #------------------------------------------------------------------
     out.append('CELL_TYPES '+str(len(element))+'\n')
     for m in range(0, len(element)):
-        n_nodes=len(element[m])
-        if n_nodes == 4:
+        n_node=len(element[m])
+        if n_node == 4:
             #cell_type=vtk.VTK_TETRA
             out.append('10'+'\n')
-        elif n_nodes == 6:
+        elif n_node == 6:
             #cell_type=vtk.VTK_WEDGE
             out.append('13'+'\n')
-        elif n_nodes == 8:
+        elif n_node == 8:
             #cell_type=vtk.VTK_HEXAHEDRON
             out.append('12'+'\n')
-        elif n_nodes == 10:
+        elif n_node == 10:
             out.append('24'+'\n')
             #cell_type=vtk.TK_QUADRATIC_TETRA
         else:

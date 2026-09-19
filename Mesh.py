@@ -299,11 +299,11 @@ class Mesh:
     def convert_to_vtk(self):
         if _Flag_VTK_IMPORT_ == False:
             raise ValueError('vtk is not imported')
-        Points_vtk = vtk.vtkPoints()
-        Points_vtk.SetDataTypeToDouble()
-        Points_vtk.SetNumberOfPoints(len(self.node))
+        point_vtk = vtk.vtkPoints()
+        point_vtk.SetDataTypeToDouble()
+        point_vtk.SetNumberOfPoints(len(self.node))
         for n in range(0, len(self.node)):
-            Points_vtk.SetPoint(n, float(self.node[n,0]), float(self.node[n,1]), float(self.node[n,2]))
+            point_vtk.SetPoint(n, float(self.node[n,0]), float(self.node[n,1]), float(self.node[n,2]))
         if 'polyhedron' in self.mesh_type:
             mesh_vtk = vtk.vtkUnstructuredGrid()
         elif 'polygon' in self.mesh_type:
@@ -315,7 +315,7 @@ class Mesh:
             mesh_vtk = vtk.vtkPolyData()
         else:
             raise ValueError('unsupported mesh_type:'+self.mesh_type)
-        mesh_vtk.SetPoints(Points_vtk)
+        mesh_vtk.SetPoints(point_vtk)
         mesh_vtk.Allocate(len(self.element))
         for n in range(0, len(self.element)):
             e=[int(id) for id in self.element[n]]

@@ -279,9 +279,9 @@ def clean_data_remove_unused_node(node, node_id, element):
     for m in range(0, len(element)):
         used_old_idx_list.extend(element[m])
     used_old_idx_list=np.unique(used_old_idx_list)
-    num_unused_nodes=len(node)-len(used_old_idx_list)
-    print('total number of unused nodes:', num_unused_nodes)
-    if num_unused_nodes == 0:
+    n_unused_node=len(node)-len(used_old_idx_list)
+    print('total number of unused nodes:', n_unused_node)
+    if n_unused_node == 0:
         return node, node_id, element
     #map old node id to new node id
     map={}

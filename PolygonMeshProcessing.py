@@ -166,7 +166,7 @@ def extract_region_enclosed_by_curve(mesh, node_curve_list, inner_element_idx, m
         counter+=1
         #if counter ==100:
         #    break
-        if len(region_element_list) > max_n_elements:
+        if len(region_element_list) > max_n_element:
             print('break: len(region_element_list) > max_n_elements @ExtractRegionEnclosedByCurve')
             break
     #--------------
@@ -675,12 +675,12 @@ def fill_hole(mesh, hole_size, clean_output=False, eps=1e-5, triangulate_output=
         cleaner.RemoveUnusedPointsOn()
         cleaner.Update()
         output_vtk=cleaner.GetOutput()
-    normals = vtk.vtkPolyDataNormals()
-    normals.SetInputData(output_vtk)
-    normals.ConsistencyOn()
-    normals.SplittingOff()
-    normals.Update()    
-    output_vtk=normals.GetOutput()
+    normal_filter = vtk.vtkPolyDataNormals()
+    normal_filter.SetInputData(output_vtk)
+    normal_filter.ConsistencyOn()
+    normal_filter.SplittingOff()
+    normal_filter.Update()    
+    output_vtk=normal_filter.GetOutput()
     if triangulate_output == False:
         output_mesh=PolygonMesh()
         output_mesh.read_mesh_vtk(output_vtk, dtype)

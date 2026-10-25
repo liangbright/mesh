@@ -82,9 +82,7 @@ class PolylineMesh(Mesh):
             elm=element[m]
             for k in range(0, len(elm)):
                 if k < len(elm)-1:
-                    a=elm[k]; b=elm[k+1]
-                else:
-                    a=elm[k]; b=elm[0]
+                    a=elm[k]; b=elm[k+1]                
                 if a < b:
                     edge.append([a, b])
                 else:

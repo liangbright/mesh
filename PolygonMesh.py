@@ -205,17 +205,14 @@ class PolygonMesh(Mesh):
 
     def is_quad_tri(self):
         if isinstance(self.element, torch.Tensor):
-            if len(self.element[0]) == 3 or len(self.element[0]) == 4:
-                #this is QuadTriangleMesh
+            if len(self.element[0]) == 3 or len(self.element[0]) == 4:                
                 return True
-            else:
-                return False
         m_min=len(self.element[0])
         m_max=len(self.element[0])
         for m in range(1, len(self.element)):
             m_min=min(m_min, len(self.element[m]))
             m_max=max(m_max, len(self.element[m]))
-        if (m_min == m_max == 3) or (m_min == m_max == 4):
+        if (m_min >= 3) and (m_max <= 4):
             return True
         else:
             return False
